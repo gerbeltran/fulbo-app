@@ -1,0 +1,9 @@
+{
+  "name": "fulbo-app-root",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix FULBO-APP",
+    "build": "npm run build --prefix FULBO-APP",
+    "preview": "npm run preview --prefix FULBO-APP"
+  }
+}

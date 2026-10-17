@@ -1,0 +1,198 @@
+rules_version = '2';
+
+// Reglas de seguridad de Fulbo (multi-grupo)
+//
+// - Solo entran usuarios logueados con Google.
+// - Cada grupo guarda en miembros_uids las cuentas con acceso; admin_uid es el admin.
+// - El admin gestiona jugadores, niveles, partidos y solicitudes de su grupo.
+// - Cada jugador puede editar solo su propio perfil (nombre, posición, foto),
+//   confirmar su asistencia y votar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ────────────────────────────────────────────────────────────
+
+    function logueado() {
+      return request.auth != null;
+    }
+
+    function rutaGrupo(grupoId) {
+      return /databases/$(database)/documents/grupos/$(grupoId);
+    }
+
+    function esMiembro(grupoId) {
+      return logueado() && request.auth.uid in get(rutaGrupo(grupoId)).data.miembros_uids;
+    }
+
+    function esAdmin(grupoId) {
+      return logueado() && get(rutaGrupo(grupoId)).data.admin_uid == request.auth.uid;
+    }
+
+    // Estado posterior a la escritura: permite crear el grupo y su contenido en un mismo batch
+    function esAdminDespues(grupoId) {
+      return logueado() && getAfter(rutaGrupo(grupoId)).data.admin_uid == request.auth.uid;
+    }
+
+    function jugador(jugadorId) {
+      return get(/databases/$(database)/documents/jugadores/$(jugadorId)).data;
+    }
+
+    function esMiJugador(jugadorId) {
+      return logueado() && jugador(jugadorId).uid_firebase == request.auth.uid;
+    }
+
+    function soloCambia(campos) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
+    }
+
+    function mantieneGrupo() {
+      return request.resource.data.grupo_id == resource.data.grupo_id;
+    }
+
+    // ─── Grupos ─────────────────────────────────────────────────────────────
+
+    match /grupos/{grupoId} {
+      allow get, list: if logueado() && request.auth.uid in resource.data.miembros_uids;
+
+      allow create: if logueado()
+        && request.resource.data.admin_uid == request.auth.uid
+        && request.resource.data.miembros_uids == [request.auth.uid]
+        && getAfter(/databases/$(database)/documents/codigos_invitacion/$(request.resource.data.codigo_invitacion)).data.grupo_id == grupoId;
+
+      // El admin edita el grupo (sin transferir la administración ni cambiar el código)
+      allow update: if logueado()
+        && resource.data.admin_uid == request.auth.uid
+        && request.resource.data.admin_uid == resource.data.admin_uid
+        && request.resource.data.codigo_invitacion == resource.data.codigo_invitacion;
+
+      // Ingreso con código: el usuario solo puede agregarse a sí mismo, y en el mismo
+      // batch tiene que dejar una solicitud con el código correcto
+      allow update: if logueado()
+        && soloCambia(['miembros_uids'])
+        && request.resource.data.miembros_uids.toSet()
+             == resource.data.miembros_uids.toSet().union([request.auth.uid].toSet())
+        && getAfter(/databases/$(database)/documents/grupos/$(grupoId)/solicitudes/$(request.auth.uid)).data.codigo
+             == resource.data.codigo_invitacion;
+
+      allow delete: if false;
+
+      // Pedidos de ingreso de cuentas aún no vinculadas a un jugador
+      match /solicitudes/{solicitudUid} {
+        allow get: if logueado() && (solicitudUid == request.auth.uid || esAdmin(grupoId));
+        allow list: if esAdmin(grupoId);
+
+        allow create, update: if logueado()
+          && solicitudUid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.estado == 'pendiente'
+          && request.resource.data.codigo == get(rutaGrupo(grupoId)).data.codigo_invitacion
+          && (resource == null || resource.data.estado == 'pendiente');
+
+        allow update, delete: if esAdmin(grupoId);
+      }
+    }
+
+    // Permite buscar un grupo por código sin poder listar todos los códigos
+    match /codigos_invitacion/{codigo} {
+      allow get: if logueado();
+      allow list: if false;
+      // Si el código ya existe esto sería un update y se rechaza: garantiza códigos únicos
+      allow create: if esAdminDespues(request.resource.data.grupo_id)
+        && getAfter(rutaGrupo(request.resource.data.grupo_id)).data.codigo_invitacion == codigo;
+      allow update, delete: if false;
+    }
+
+    // ─── Jugadores ──────────────────────────────────────────────────────────
+
+    match /jugadores/{jugadorId} {
+      allow read: if logueado()
+        && (resource.data.uid_firebase == request.auth.uid || esMiembro(resource.data.grupo_id));
+
+      allow create: if esAdminDespues(request.resource.data.grupo_id);
+
+      // Admin: todo, menos mover el jugador a otro grupo
+      allow update: if esAdmin(resource.data.grupo_id) && mantieneGrupo();
+
+      // Jugador: solo su propio perfil y sin tocar nivel, estado ni vinculación
+      allow update: if logueado()
+        && resource.data.uid_firebase == request.auth.uid
+        && soloCambia(['nombre', 'posicion_preferida', 'foto_url']);
+
+      allow delete: if esAdmin(resource.data.grupo_id);
+    }
+
+    match /miembros_grupo/{miembroId} {
+      allow read: if esMiembro(resource.data.grupo_id);
+
+      // El id es {grupoId}_{jugadorId}
+      allow create: if esAdminDespues(request.resource.data.grupo_id)
+        && miembroId == request.resource.data.grupo_id + '_' + request.resource.data.jugador_id;
+
+      allow update: if esAdmin(resource.data.grupo_id) && mantieneGrupo();
+      allow delete: if esAdmin(miembroId.split('_')[0]);
+    }
+
+    // ─── Partidos ───────────────────────────────────────────────────────────
+
+    match /partidos/{partidoId} {
+      allow read: if esMiembro(resource.data.grupo_id);
+      allow create: if esAdmin(request.resource.data.grupo_id);
+
+      // Los votos de cualquier jugador pueden avanzar la combinación o confirmar equipos
+      allow update: if mantieneGrupo()
+        && (esAdmin(resource.data.grupo_id)
+            || (esMiembro(resource.data.grupo_id) && soloCambia(['estado', 'combinacion_actual'])));
+
+      allow delete: if esAdmin(resource.data.grupo_id);
+    }
+
+    match /participaciones/{participacionId} {
+      allow read: if esMiembro(resource.data.grupo_id);
+
+      allow create: if esMiembro(request.resource.data.grupo_id)
+        && jugador(request.resource.data.jugador_id).grupo_id == request.resource.data.grupo_id
+        && (esMiJugador(request.resource.data.jugador_id) || esAdmin(request.resource.data.grupo_id));
+
+      allow update: if mantieneGrupo()
+        && (esAdmin(resource.data.grupo_id)
+            // Mi asistencia y mis votos
+            || (esMiJugador(resource.data.jugador_id)
+                && soloCambia(['confirmo_asistencia', 'votos_equipos']))
+            // Al regenerar combinaciones cualquier miembro reinicia los votos de todos
+            || (esMiembro(resource.data.grupo_id)
+                && soloCambia(['votos_equipos'])
+                && request.resource.data.votos_equipos.size() == 0));
+
+      allow delete: if esAdmin(resource.data.grupo_id);
+    }
+
+    // Combinaciones de equipos (id = id del partido)
+    match /equipo_partido/{partidoId} {
+      allow read: if resource == null || esMiembro(resource.data.grupo_id);
+      allow create: if esMiembro(request.resource.data.grupo_id);
+      allow update: if esMiembro(resource.data.grupo_id) && mantieneGrupo();
+      allow delete: if esAdmin(resource.data.grupo_id);
+    }
+
+    match /convocatoria_config/{grupoId} {
+      allow read: if esMiembro(grupoId);
+      allow write: if esAdmin(grupoId);
+    }
+
+    match /votos_mvp/{votoId} {
+      allow read: if esMiembro(resource.data.grupo_id);
+      allow create: if esMiembro(request.resource.data.grupo_id)
+        && esMiJugador(request.resource.data.votante_jugador_id)
+        && jugador(request.resource.data.votante_jugador_id).grupo_id == request.resource.data.grupo_id;
+      allow update: if false;
+      allow delete: if esAdmin(resource.data.grupo_id);
+    }
+
+    match /noticias/{noticiaId} {
+      allow read: if logueado();
+      allow write: if false;
+    }
+
+    // Todo lo demás (incluida la vieja colección solicitudes_acceso) queda bloqueado
+  }
+}

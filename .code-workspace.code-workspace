@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"name": "FVG-DEV100_NEW(ABAP)",
+			"uri": "adt://fvg-dev100_new"
+		},
+		{
+			"name": "FVG-DEV100_NEW(ABAP)",
+			"uri": "adt://fvg-dev100_new"
+		}
+	],
+	"settings": {
+		"github.copilot.chat.virtualTools.threshold": 0
+	}
+}
