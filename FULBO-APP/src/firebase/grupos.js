@@ -3,6 +3,7 @@ import {
   arrayUnion, arrayRemove, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './config'
+import { notificar, mensajes } from './notificaciones'
 
 // ─── Estructura en Firestore ──────────────────────────────────────────────────
 //   grupos/{grupoId}                     nombre, codigo_invitacion, admin_uid, miembros_uids[], creado_en
@@ -63,6 +64,7 @@ export async function crearGrupo({ nombre, usuario, importarDatosAnteriores = fa
   batch.set(doc(db, 'codigos_invitacion', codigo), {
     grupo_id: grupoRef.id,
     grupo_nombre: nombre,
+    admin_uid: usuario.uid, // para avisarle de nuevas solicitudes
     creado_en: serverTimestamp(),
   })
 
@@ -105,7 +107,7 @@ export async function unirseAGrupo({ codigo, usuario, gruposYaVinculados = [] })
   const snapCodigo = await getDoc(doc(db, 'codigos_invitacion', codigoLimpio))
   if (!snapCodigo.exists()) throw new Error('Código de invitación inválido')
 
-  const { grupo_id: grupoId } = snapCodigo.data()
+  const { grupo_id: grupoId, grupo_nombre: grupoNombre, admin_uid: adminUid } = snapCodigo.data()
   if (gruposYaVinculados.includes(grupoId)) throw new Error('Ya sos miembro de este grupo')
 
   const solicitudRef = refSolicitud(grupoId, usuario.uid)
@@ -126,7 +128,35 @@ export async function unirseAGrupo({ codigo, usuario, gruposYaVinculados = [] })
   })
   batch.update(doc(db, 'grupos', grupoId), { miembros_uids: arrayUnion(usuario.uid) })
   await batch.commit()
+
+  // Solo la primera vez que lo pide (si reingresa el código no volvemos a avisar)
+  if (!snapSolicitud.exists()) {
+    await avisarAlAdmin({ grupoId, grupoNombre, adminUid, usuario })
+  }
   return grupoId
+}
+
+async function avisarAlAdmin({ grupoId, grupoNombre, adminUid, usuario }) {
+  try {
+    // Los códigos creados antes de las notificaciones no guardan admin_uid:
+    // ya siendo miembro, lo leemos del grupo
+    if (!adminUid) {
+      const snapGrupo = await getDoc(doc(db, 'grupos', grupoId))
+      adminUid = snapGrupo.data()?.admin_uid
+    }
+    if (!adminUid) return
+    await notificar({
+      grupoId,
+      grupoNombre,
+      tipo: 'solicitud_pendiente',
+      mensaje: mensajes.solicitudPendiente(nombreDesdeCuenta(usuario)),
+      autorUid: usuario.uid,
+      destinatarioUid: adminUid,
+      datosExtra: { uid: usuario.uid, email: usuario.email ?? '' },
+    })
+  } catch (err) {
+    console.error('No se pudo avisar al admin de la solicitud', err)
+  }
 }
 
 // ─── Desvincular una cuenta de Google de un jugador ──────────────────────────

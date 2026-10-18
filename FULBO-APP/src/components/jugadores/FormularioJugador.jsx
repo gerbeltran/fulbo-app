@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CLUBES_SUGERIDOS } from '../../utils/clubes'
 
 const POSICIONES = [
   { valor: 'ARQ', etiqueta: 'Arquero' },
@@ -13,6 +14,7 @@ const estadoInicial = {
   nivel_general: 3,
   activo: true,
   foto_url: '',
+  club: '',
 }
 
 export default function FormularioJugador({
@@ -35,6 +37,7 @@ export default function FormularioJugador({
           nivel_general: jugador.nivel_general,
           activo: jugador.activo,
           foto_url: jugador.foto_url ?? '',
+          club: jugador.club ?? '',
         }
       : {
           ...estadoInicial,
@@ -54,7 +57,7 @@ export default function FormularioJugador({
       setError('El nombre es obligatorio')
       return
     }
-    onGuardar({ ...form, nombre: form.nombre.trim() })
+    onGuardar({ ...form, nombre: form.nombre.trim(), club: form.club.trim() })
   }
 
   return (
@@ -125,6 +128,31 @@ export default function FormularioJugador({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Club */}
+          <div>
+            <label
+              className="block text-[#8892a4] mb-1 uppercase font-semibold"
+              style={{ fontSize: '10px', letterSpacing: '0.07em' }}
+            >
+              Club del que es hincha{' '}
+              <span className="text-[#6b7a8d] normal-case" style={{ fontSize: '9px' }}>
+                (opcional)
+              </span>
+            </label>
+            <input
+              type="text"
+              list="clubes-sugeridos-admin"
+              value={form.club}
+              onChange={(e) => handleChange('club', e.target.value)}
+              placeholder="Ej: River Plate"
+              className="w-full bg-[#1a1f2e] border border-[#2a3040] px-3 py-2.5 text-[#e0e6f0] text-sm focus:outline-none focus:ring-1 focus:ring-[#4caf50] focus:border-[#4caf50]"
+              style={{ borderRadius: '3px' }}
+            />
+            <datalist id="clubes-sugeridos-admin">
+              {CLUBES_SUGERIDOS.map((c) => <option key={c} value={c} />)}
+            </datalist>
           </div>
 
           {/* Nivel */}

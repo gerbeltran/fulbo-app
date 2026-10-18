@@ -56,15 +56,15 @@ export default function PanelVotacionEquipos({
         </span>
       </div>
 
-      {/* Leyenda de equipos */}
+      {/* Leyenda de equipos (en la cancha: Equipo 2 arriba, Equipo 1 abajo) */}
       <div className="flex justify-between items-center text-xs font-semibold px-0.5">
         <span className="flex items-center gap-1.5 text-[#60a5fa]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB] inline-block shrink-0" />
-          Equipo 1 — {niv1} pts
+          <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6] inline-block shrink-0" />
+          Equipo 1 (abajo) — {niv1} pts
         </span>
         <span className="flex items-center gap-1.5 text-[#f87171]">
-          Equipo 2 — {niv2} pts
-          <span className="w-2.5 h-2.5 rounded-full bg-[#DC2626] inline-block shrink-0" />
+          Equipo 2 (arriba) — {niv2} pts
+          <span className="w-2.5 h-2.5 rounded-full bg-[#EF4444] inline-block shrink-0" />
         </span>
       </div>
 

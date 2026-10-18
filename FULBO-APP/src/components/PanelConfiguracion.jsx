@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useGrupo } from '../context/GrupoContext'
+import BotonWhatsApp from './BotonWhatsApp'
+import { mensajeInvitacion } from '../utils/whatsapp'
 
 export default function PanelConfiguracion({ onAbrirPerfil, onCerrar }) {
   const { usuario, cerrarSesion } = useAuth()
@@ -97,6 +99,9 @@ export default function PanelConfiguracion({ onAbrirPerfil, onCerrar }) {
                   </button>
                 )}
               </div>
+            </div>
+            <div className="mt-3">
+              <BotonWhatsApp mensaje={mensajeInvitacion(codigo)} etiqueta="Invitar por WhatsApp" />
             </div>
             <p className="text-[#6b7a8d] text-xs mt-2">
               Quien entre con este código queda pendiente hasta que lo vincules

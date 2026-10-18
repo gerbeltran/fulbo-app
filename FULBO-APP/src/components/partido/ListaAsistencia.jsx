@@ -1,3 +1,5 @@
+import { CUPO_POR_DEFECTO, esTitular, esSuplente, ordenarPorInscripcion } from '../../utils/suplentes'
+
 const POS_ESTILOS = {
   ARQ: { background: '#3d2a00', color: '#ffcc80', border: '1px solid #5a3d00' },
   DEF: { background: '#1a2a1a', color: '#a5d6a7', border: '1px solid #2a4a2a' },
@@ -22,7 +24,15 @@ function Avatar({ nombre }) {
   )
 }
 
-function FilaJugador({ jugador, estado, esSelf, estaAbierto, onConfirmar }) {
+const ETIQUETA_ESTADO = {
+  titular: { texto: 'Confirmó', estilo: 'bg-[#1b3d22] text-[#4caf50] border border-[#2d5a3d]' },
+  suplente: { texto: 'Suplente', estilo: 'bg-[#3d3000] text-[#f59e0b] border border-[#5a4500]' },
+  rechazado: { texto: 'No va', estilo: 'bg-[#3d1a1a] text-[#ef9a9a] border border-[#5a2a2a]' },
+  sin_respuesta: { texto: 'Pendiente', estilo: 'bg-[#2a3040] text-[#6b7a8d] border border-[#3a4050]' },
+}
+
+function FilaJugador({ jugador, estado, posicionEspera, esSelf, puedeEditar, onConfirmar, onMover }) {
+  const anotado = estado === 'titular' || estado === 'suplente'
   return (
     <div
       className={`bg-[#1e2435] border-b border-[#242b3d] px-3 py-2.5 flex items-center gap-3 ${
@@ -32,6 +42,11 @@ function FilaJugador({ jugador, estado, esSelf, estaAbierto, onConfirmar }) {
       <Avatar nombre={jugador.nombre} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
+          {posicionEspera && (
+            <span className="text-[#f59e0b] font-bold" style={{ fontSize: '10px' }}>
+              #{posicionEspera}
+            </span>
+          )}
           <span className="font-semibold text-[#e0e6f0] text-sm truncate">
             {jugador.nombre}
           </span>
@@ -44,27 +59,41 @@ function FilaJugador({ jugador, estado, esSelf, estaAbierto, onConfirmar }) {
             </span>
           )}
         </div>
-        <span
-          className="uppercase font-semibold px-1.5 py-0.5 mt-0.5 inline-block"
-          style={{
-            ...POS_ESTILOS[jugador.posicion_preferida],
-            borderRadius: '2px',
-            fontSize: '9px',
-            letterSpacing: '0.05em',
-          }}
-        >
-          {jugador.posicion_preferida}
-        </span>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span
+            className="uppercase font-semibold px-1.5 py-0.5 inline-block"
+            style={{
+              ...POS_ESTILOS[jugador.posicion_preferida],
+              borderRadius: '2px',
+              fontSize: '9px',
+              letterSpacing: '0.05em',
+            }}
+          >
+            {jugador.posicion_preferida}
+          </span>
+          {/* Admin: mover entre titulares y suplentes */}
+          {onMover && anotado && (
+            <button
+              onClick={() => onMover(jugador.id, estado === 'titular')}
+              className="text-[#6b7a8d] hover:text-[#f59e0b] underline transition-colors"
+              style={{ fontSize: '10px' }}
+            >
+              {estado === 'titular' ? 'Pasar a suplente' : 'Pasar a titular'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="shrink-0">
-        {esSelf && estaAbierto ? (
+        {puedeEditar ? (
           <div className="flex gap-1.5">
             <button
               onClick={() => onConfirmar(jugador.id, true)}
               className={`px-2.5 py-1.5 font-semibold uppercase transition-colors ${
-                estado === 'confirmado'
+                estado === 'titular'
                   ? 'bg-[#245c33] border border-[#2d7a3d] text-white'
+                  : estado === 'suplente'
+                  ? 'bg-[#5c4500] border border-[#7a5c00] text-white'
                   : 'bg-[#1a1f2e] border border-[#2a3040] text-[#8892a4] hover:border-[#4caf50] hover:text-[#4caf50]'
               }`}
               style={{ fontSize: '10px', letterSpacing: '0.05em', borderRadius: '3px' }}
@@ -85,16 +114,10 @@ function FilaJugador({ jugador, estado, esSelf, estaAbierto, onConfirmar }) {
           </div>
         ) : (
           <span
-            className={`px-2 py-0.5 font-semibold uppercase ${
-              estado === 'confirmado'
-                ? 'bg-[#1b3d22] text-[#4caf50] border border-[#2d5a3d]'
-                : estado === 'rechazado'
-                ? 'bg-[#3d1a1a] text-[#ef9a9a] border border-[#5a2a2a]'
-                : 'bg-[#2a3040] text-[#6b7a8d] border border-[#3a4050]'
-            }`}
+            className={`px-2 py-0.5 font-semibold uppercase ${ETIQUETA_ESTADO[estado].estilo}`}
             style={{ fontSize: '9px', letterSpacing: '0.05em', borderRadius: '2px' }}
           >
-            {estado === 'confirmado' ? 'Confirmó' : estado === 'rechazado' ? 'No va' : 'Pendiente'}
+            {ETIQUETA_ESTADO[estado].texto}
           </span>
         )}
       </div>
@@ -107,22 +130,35 @@ export default function ListaAsistencia({
   participaciones,
   jugadorActualId,
   estaAbierto,
+  esAdmin = false,
+  cupoMaximo = CUPO_POR_DEFECTO,
   onConfirmar,
+  onMoverSuplente,
 }) {
   function getEstado(jugadorId) {
     const p = participaciones.find((p) => p.jugador_id === jugadorId)
     if (!p) return 'sin_respuesta'
-    if (p.confirmo_asistencia === true) return 'confirmado'
+    if (esTitular(p)) return 'titular'
+    if (esSuplente(p)) return 'suplente'
     if (p.confirmo_asistencia === false) return 'rechazado'
     return 'sin_respuesta'
   }
 
-  const confirmados = jugadores.filter((j) => getEstado(j.id) === 'confirmado')
+  const porId = Object.fromEntries(jugadores.map((j) => [j.id, j]))
+  // Titulares y suplentes en orden de inscripción (el que vuelve a confirmar va al final)
+  const enOrdenDeLlegada = (filtro) =>
+    ordenarPorInscripcion(participaciones.filter(filtro))
+      .map((p) => porId[p.jugador_id])
+      .filter(Boolean)
+  const titulares = enOrdenDeLlegada(esTitular)
+  const suplentes = enOrdenDeLlegada(esSuplente)
   const sinRespuesta = jugadores.filter((j) => getEstado(j.id) === 'sin_respuesta')
   const rechazados = jugadores.filter((j) => getEstado(j.id) === 'rechazado')
 
-  const Grupo = ({ titulo, lista }) =>
-    lista.length === 0 ? null : (
+  const cupoCompleto = titulares.length >= cupoMaximo
+
+  const Grupo = ({ titulo, contador, lista, mostrarVacio = false, numerar = false }) =>
+    lista.length === 0 && !mostrarVacio ? null : (
       <div>
         <div
           className="px-3 py-1.5 flex items-center gap-2 border-y border-[#2a3040]"
@@ -138,18 +174,21 @@ export default function ListaAsistencia({
             className="text-[#4caf50] font-bold"
             style={{ fontSize: '10px' }}
           >
-            {lista.length}
+            {contador ?? lista.length}
           </span>
         </div>
         <div>
-          {lista.map((j) => (
+          {lista.map((j, i) => (
             <FilaJugador
               key={j.id}
               jugador={j}
               estado={getEstado(j.id)}
+              posicionEspera={numerar ? i + 1 : null}
               esSelf={j.id === jugadorActualId}
-              estaAbierto={estaAbierto}
+              // Cada uno edita su asistencia; el admin, la de todos
+              puedeEditar={estaAbierto && (j.id === jugadorActualId || esAdmin)}
               onConfirmar={onConfirmar}
+              onMover={esAdmin && estaAbierto ? onMoverSuplente : null}
             />
           ))}
         </div>
@@ -158,12 +197,23 @@ export default function ListaAsistencia({
 
   return (
     <div className="overflow-hidden" style={{ borderRadius: '4px', border: '1px solid #2a3040' }}>
-      {confirmados.length === 0 && sinRespuesta.length === 0 && rechazados.length === 0 && (
+      {jugadores.length === 0 && (
         <p className="text-sm text-[#6b7a8d] italic text-center py-6 bg-[#1e2435]">
           No hay jugadores activos registrados.
         </p>
       )}
-      <Grupo titulo="Confirmados" lista={confirmados} />
+      {estaAbierto && cupoCompleto && (
+        <p className="text-xs text-[#f59e0b] bg-[#3d3000]/40 px-3 py-2 border-b border-[#2a3040]">
+          Cupo completo: los que confirmen ahora quedan como suplentes.
+        </p>
+      )}
+      <Grupo
+        titulo="Confirmados"
+        contador={`${titulares.length}/${cupoMaximo}`}
+        lista={titulares}
+        mostrarVacio={jugadores.length > 0}
+      />
+      <Grupo titulo="Suplentes" lista={suplentes} numerar />
       <Grupo titulo="Sin respuesta" lista={sinRespuesta} />
       <Grupo titulo="No van" lista={rechazados} />
     </div>

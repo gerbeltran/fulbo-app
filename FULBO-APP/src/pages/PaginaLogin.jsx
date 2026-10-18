@@ -12,7 +12,10 @@ export default function PaginaLogin() {
     try {
       await loginConGoogle()
     } catch (err) {
-      setError(err.code ? `Error: ${err.code}` : 'No se pudo iniciar sesión. Intentá de nuevo.')
+      setError(
+        err.mensajeUsuario ??
+          (err.code ? `Error: ${err.code}` : 'No se pudo iniciar sesión. Intentá de nuevo.')
+      )
       console.error(err)
     } finally {
       setCargando(false)

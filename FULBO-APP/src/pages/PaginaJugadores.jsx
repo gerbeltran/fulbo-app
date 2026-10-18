@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import CampanaNotificaciones from '../components/CampanaNotificaciones'
 import TarjetaJugador from '../components/jugadores/TarjetaJugador'
 import FormularioJugador from '../components/jugadores/FormularioJugador'
 import ModalVincularSolicitud from '../components/jugadores/ModalVincularSolicitud'
@@ -103,12 +104,12 @@ export default function PaginaJugadores({
       } else if (solicitudParaVincular) {
         // Jugador nuevo para la cuenta que pidió entrar
         await verificarCuentaLibre(solicitudParaVincular.uid)
-        await agregarJugador({
+        const nuevoId = await agregarJugador({
           ...datos,
           foto_url: datos.foto_url || solicitudParaVincular.foto_url || '',
           uid_firebase: solicitudParaVincular.uid,
         })
-        await marcarVinculada(solicitudParaVincular)
+        await marcarVinculada(solicitudParaVincular, nuevoId)
       } else {
         await agregarJugador(datos)
       }
@@ -159,6 +160,9 @@ export default function PaginaJugadores({
           >
             Jugadores
           </h1>
+          <div className="ml-auto">
+            <CampanaNotificaciones />
+          </div>
         </div>
         <div className="flex items-center justify-between">
           <p className="text-[#81c784] text-xs">

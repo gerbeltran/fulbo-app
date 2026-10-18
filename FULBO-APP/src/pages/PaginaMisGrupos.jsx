@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useGrupo } from '../context/GrupoContext'
 import { useAuth } from '../context/AuthContext'
 import { obtenerJugadoresSinGrupo } from '../firebase/grupos'
+import CampanaNotificaciones from '../components/CampanaNotificaciones'
 
 export default function PaginaMisGrupos() {
   const { misGrupos, seleccionarGrupo, crearGrupo, unirseAGrupo, cargando, error: errorGrupos } = useGrupo()
@@ -82,12 +83,15 @@ export default function PaginaMisGrupos() {
             {usuario?.email}
           </p>
         </div>
-        <button
-          onClick={cerrarSesion}
-          className="text-[#6b7a8d] text-xs hover:text-[#4caf50] border border-[#2d5a3d] px-3 py-1.5 rounded transition-colors"
-        >
-          Salir
-        </button>
+        <div className="flex items-center gap-2">
+          <CampanaNotificaciones />
+          <button
+            onClick={cerrarSesion}
+            className="text-[#6b7a8d] text-xs hover:text-[#4caf50] border border-[#2d5a3d] px-3 py-1.5 rounded transition-colors"
+          >
+            Salir
+          </button>
+        </div>
       </div>
 
       <p

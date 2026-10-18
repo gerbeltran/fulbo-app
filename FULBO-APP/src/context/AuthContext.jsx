@@ -1,18 +1,15 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import {
-  onAuthStateChanged, signInWithPopup, signInWithRedirect,
-  GoogleAuthProvider, signOut,
+  onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut,
 } from 'firebase/auth'
 import { auth } from '../firebase/config'
 
 const AuthContext = createContext(null)
 
-// Errores de popup en los que conviene reintentar con redirect
-// (ej: PWA instalada en iOS, navegadores que bloquean popups)
-const ERRORES_USAR_REDIRECT = [
-  'auth/popup-blocked',
-  'auth/operation-not-supported-in-this-environment',
-]
+// Usamos solo popup: signInWithRedirect falla en mobile y en PWA instaladas
+// por el storage particionado ("missing initial state")
+const MENSAJE_POPUP_BLOQUEADO =
+  'Tu navegador bloqueó la ventana de login. Por favor, permitir popups para este sitio.'
 
 // Errores que no hace falta mostrar (el usuario cerró el popup)
 const ERRORES_SILENCIOSOS = [
@@ -40,9 +37,11 @@ export function AuthProvider({ children }) {
       await signInWithPopup(auth, provider)
     } catch (err) {
       if (ERRORES_SILENCIOSOS.includes(err.code)) return
-      if (ERRORES_USAR_REDIRECT.includes(err.code)) {
-        await signInWithRedirect(auth, provider)
-        return
+      if (err.code === 'auth/popup-blocked') {
+        const error = new Error(MENSAJE_POPUP_BLOQUEADO)
+        error.code = err.code
+        error.mensajeUsuario = MENSAJE_POPUP_BLOQUEADO
+        throw error
       }
       throw err
     }

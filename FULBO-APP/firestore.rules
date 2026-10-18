@@ -116,7 +116,7 @@ service cloud.firestore {
       // Jugador: solo su propio perfil y sin tocar nivel, estado ni vinculación
       allow update: if logueado()
         && resource.data.uid_firebase == request.auth.uid
-        && soloCambia(['nombre', 'posicion_preferida', 'foto_url']);
+        && soloCambia(['nombre', 'posicion_preferida', 'foto_url', 'club']);
 
       allow delete: if esAdmin(resource.data.grupo_id);
     }
@@ -155,9 +155,14 @@ service cloud.firestore {
 
       allow update: if mantieneGrupo()
         && (esAdmin(resource.data.grupo_id)
-            // Mi asistencia y mis votos
+            // Mi asistencia, mi lugar en la lista y mis votos
             || (esMiJugador(resource.data.jugador_id)
-                && soloCambia(['confirmo_asistencia', 'votos_equipos']))
+                && soloCambia(['confirmo_asistencia', 'votos_equipos', 'es_suplente', 'inscripto_en']))
+            // Cuando un titular se baja, su navegador sube al primer suplente
+            || (esMiembro(resource.data.grupo_id)
+                && soloCambia(['es_suplente'])
+                && resource.data.confirmo_asistencia == true
+                && request.resource.data.es_suplente == false)
             // Al regenerar combinaciones cualquier miembro reinicia los votos de todos
             || (esMiembro(resource.data.grupo_id)
                 && soloCambia(['votos_equipos'])
@@ -186,6 +191,56 @@ service cloud.firestore {
         && jugador(request.resource.data.votante_jugador_id).grupo_id == request.resource.data.grupo_id;
       allow update: if false;
       allow delete: if esAdmin(resource.data.grupo_id);
+    }
+
+    // ─── Notificaciones in-app ──────────────────────────────────────────────
+    // destinatario_uid = null → para todos los miembros del grupo.
+    // No hay backend: las crea el navegador de quien dispara el evento,
+    // y estas reglas limitan quién puede crear cada tipo.
+
+    function puedeLeerNotificacion(datos) {
+      return logueado()
+        && (datos.destinatario_uid == request.auth.uid
+            || (datos.destinatario_uid == null && esMiembro(datos.grupo_id)));
+    }
+
+    match /notificaciones/{notificacionId} {
+      allow read: if puedeLeerNotificacion(resource.data);
+
+      allow create: if logueado()
+        && request.resource.data.autor_uid == request.auth.uid
+        && request.resource.data.creada_en == request.time
+        && (request.resource.data.leida_por == [] || request.resource.data.leida_por == [request.auth.uid])
+        && request.resource.data.tipo in [
+             'solicitud_pendiente', 'solicitud_aprobada', 'solicitud_rechazada',
+             'nueva_convocatoria', 'votacion_equipos', 'equipos_confirmados',
+             'votacion_mvp', 'traidor', 'paso_a_titular', 'nuevo_titular'
+           ]
+        && esMiembro(request.resource.data.grupo_id)
+        && (
+          // El admin puede crear cualquier notificación de su grupo
+          esAdmin(request.resource.data.grupo_id)
+          // Un jugador dispara estas al votar o al bajarse
+          || (request.resource.data.destinatario_uid == null
+              && request.resource.data.tipo in ['equipos_confirmados', 'traidor', 'nuevo_titular'])
+          // Al liberarse un lugar se avisa al suplente que sube (a su propia cuenta)
+          || (request.resource.data.tipo == 'paso_a_titular'
+              && jugador(request.resource.data.jugador_id).grupo_id == request.resource.data.grupo_id
+              && request.resource.data.destinatario_uid
+                   == jugador(request.resource.data.jugador_id).uid_firebase)
+          // Quien se une con código avisa solo al admin
+          || (request.resource.data.tipo == 'solicitud_pendiente'
+              && request.resource.data.destinatario_uid
+                   == get(rutaGrupo(request.resource.data.grupo_id)).data.admin_uid)
+        );
+
+      // Cada uno solo puede marcarla como leída para sí mismo
+      allow update: if puedeLeerNotificacion(resource.data)
+        && soloCambia(['leida_por'])
+        && request.resource.data.leida_por.toSet()
+             == resource.data.leida_por.toSet().union([request.auth.uid].toSet());
+
+      allow delete: if false;
     }
 
     match /noticias/{noticiaId} {

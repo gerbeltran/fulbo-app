@@ -1,7 +1,64 @@
+import { useState } from 'react'
 import { usePartido } from '../hooks/usePartido'
 import PanelAdmin from '../components/partido/PanelAdmin'
 import ListaAsistencia from '../components/partido/ListaAsistencia'
 import PanelVotacionEquipos from '../components/partido/PanelVotacionEquipos'
+import { esTitular } from '../utils/suplentes'
+import { mensajePartido } from '../utils/whatsapp'
+import BotonWhatsApp from '../components/BotonWhatsApp'
+
+// Bajarse cuando los equipos ya están armados avisa a todo el grupo
+// (salvo que seas suplente: ahí solo dejás la lista de espera)
+function BotonBajarse({ onBajarse, esSuplente }) {
+  const [confirmando, setConfirmando] = useState(false)
+  const [bajando, setBajando] = useState(false)
+
+  async function handleBajarse() {
+    setBajando(true)
+    try {
+      await onBajarse()
+    } finally {
+      setBajando(false)
+      setConfirmando(false)
+    }
+  }
+
+  if (!confirmando) {
+    return (
+      <button
+        onClick={() => setConfirmando(true)}
+        className="w-full border border-[#5c2424] text-[#ef9a9a] py-2 rounded-xl text-sm font-medium hover:bg-[#3d1a1a] transition-colors"
+      >
+        {esSuplente ? '🏃 Salir de la lista de suplentes' : '🏃 Me bajo del partido'}
+      </button>
+    )
+  }
+  return (
+    <div className="bg-[#3d1a1a] border border-[#5c2424] rounded-xl p-3 space-y-2">
+      <p className="text-sm text-[#ef9a9a] font-medium text-center">
+        {esSuplente
+          ? '¿Seguro que querés salir de la lista de suplentes?'
+          : 'Los equipos ya están armados. Si te bajás, se entera todo el grupo. ⚖️'}
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setConfirmando(false)}
+          disabled={bajando}
+          className="flex-1 py-2 border border-[#2a3040] text-[#8892a4] rounded-xl text-sm font-medium hover:bg-[#242b3d] disabled:opacity-50 transition-colors"
+        >
+          Me quedo
+        </button>
+        <button
+          onClick={handleBajarse}
+          disabled={bajando}
+          className="flex-1 py-2 bg-[#5c2424] border border-[#7a2d2d] text-white rounded-xl text-sm font-semibold hover:bg-[#7a2d2d] disabled:opacity-50 transition-colors"
+        >
+          {bajando ? 'Bajándome...' : 'Sí, me bajo'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, jugadorActual, esAdmin }) {
   const {
@@ -14,6 +71,7 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
     cargando,
     error,
     confirmados,
+    suplentes,
     votosActuales,
     porcentajeAprobacion,
     deberiaAbrirSchedule,
@@ -24,6 +82,8 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
     cerrarConvocatoria,
     guardarConfig,
     confirmarAsistencia,
+    cambiarSuplente,
+    cambiarCupo,
     votarEquipos,
     forzarCombinacion,
     avanzarCombinacion,
@@ -34,9 +94,14 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
   const miParticipacion = participaciones.find(
     (p) => p.jugador_id === jugadorActual?.id
   )
-  const puedeVotar = miParticipacion?.confirmo_asistencia === true
+  // Solo votan los titulares
+  const puedeVotar = !!miParticipacion && esTitular(miParticipacion)
   const combIdxActual = partido?.combinacion_actual ?? 0
   const miVoto = miParticipacion?.votos_equipos?.[combIdxActual]
+  const puedeBajarse =
+    miParticipacion?.confirmo_asistencia === true &&
+    ['votando', 'confirmado'].includes(partido?.estado)
+  const soySuplente = miParticipacion?.confirmo_asistencia === true && !puedeVotar
 
   function formatearFecha(fecha) {
     if (!fecha) return null
@@ -117,8 +182,15 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
             )}
           </div>
           <div className="mt-2 text-xs text-[#6b7a8d]">
-            {confirmados.length} confirmado{confirmados.length !== 1 ? 's' : ''}
+            {confirmados.length}/{partido.cupo_maximo} confirmado{confirmados.length !== 1 ? 's' : ''}
+            {suplentes.length > 0 && ` · ${suplentes.length} suplente${suplentes.length !== 1 ? 's' : ''}`}
           </div>
+          {/* Admin: aviso al grupo de WhatsApp según el estado del partido */}
+          {esAdmin && mensajePartido(partido) && (
+            <div className="mt-3">
+              <BotonWhatsApp mensaje={mensajePartido(partido)} etiqueta="Avisar al grupo por WhatsApp" />
+            </div>
+          )}
         </div>
       )}
 
@@ -159,6 +231,7 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
                 onCerrarConvocatoria={cerrarConvocatoria}
                 onBorrarConvocatoria={borrarConvocatoria}
                 onGuardarConfig={guardarConfig}
+                onCambiarCupo={cambiarCupo}
               />
             )}
 
@@ -182,7 +255,10 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
                 participaciones={participaciones}
                 jugadorActualId={jugadorActual?.id}
                 estaAbierto={true}
+                esAdmin={esAdmin}
+                cupoMaximo={partido.cupo_maximo}
                 onConfirmar={confirmarAsistencia}
+                onMoverSuplente={cambiarSuplente}
               />
             )}
 
@@ -204,6 +280,12 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
                   onForzar={forzarCombinacion}
                   onAvanzar={() => avanzarCombinacion()}
                 />
+                {puedeBajarse && (
+                  <BotonBajarse
+                    esSuplente={soySuplente}
+                    onBajarse={() => confirmarAsistencia(jugadorActual.id, false)}
+                  />
+                )}
                 <details className="mt-2">
                   <summary className="text-xs text-[#6b7a8d] cursor-pointer hover:text-[#8892a4] transition-colors">
                     Ver lista de asistencia
@@ -214,6 +296,7 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
                       participaciones={participaciones}
                       jugadorActualId={jugadorActual?.id}
                       estaAbierto={false}
+                      cupoMaximo={partido.cupo_maximo}
                       onConfirmar={confirmarAsistencia}
                     />
                   </div>
@@ -239,6 +322,12 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
                   onForzar={null}
                   onAvanzar={null}
                 />
+                {puedeBajarse && (
+                  <BotonBajarse
+                    esSuplente={soySuplente}
+                    onBajarse={() => confirmarAsistencia(jugadorActual.id, false)}
+                  />
+                )}
                 <details className="mt-2">
                   <summary className="text-xs text-[#6b7a8d] cursor-pointer hover:text-[#8892a4] transition-colors">
                     Ver lista de asistencia
@@ -249,6 +338,7 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
                       participaciones={participaciones}
                       jugadorActualId={jugadorActual?.id}
                       estaAbierto={false}
+                      cupoMaximo={partido.cupo_maximo}
                       onConfirmar={confirmarAsistencia}
                     />
                   </div>

@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from './context/AuthContext'
 import { useGrupo } from './context/GrupoContext'
+import { useNotificaciones } from './context/NotificacionesContext'
+import CampanaNotificaciones from './components/CampanaNotificaciones'
 import { useJugadores } from './hooks/useJugadores'
 import Navbar from './components/Navbar'
 import PaginaLogin from './pages/PaginaLogin'
@@ -28,6 +30,20 @@ function AppContenido() {
   const [pantallaExtra, setPantallaExtra] = useState(null)
   const [mostrandoConfig, setMostrandoConfig] = useState(false)
   const jugadoresHook = useJugadores(grupoActivo?.id)
+  const { destino, limpiarDestino } = useNotificaciones()
+
+  // Navegación pedida al tocar una notificación
+  useEffect(() => {
+    if (!destino) return
+    if (destino === 'jugadores') {
+      if (esAdminDelGrupo) setPantallaExtra('jugadores')
+    } else {
+      setPantallaExtra(null)
+      setPaginaActual(destino)
+    }
+    setMostrandoConfig(false)
+    limpiarDestino()
+  }, [destino])
 
   if (pantallaExtra === 'jugadores' && esAdminDelGrupo) {
     return (
@@ -91,6 +107,7 @@ function AppContenido() {
                 <span>Jugadores</span>
               </button>
             )}
+            <CampanaNotificaciones />
             <button
               onClick={() => setMostrandoConfig(true)}
               className="text-[#6b7a8d] border border-[#2d5a3d] px-2 py-1.5 text-xs rounded hover:text-[#4caf50] hover:border-[#4caf50] transition-colors"
@@ -138,7 +155,12 @@ function AppContenido() {
         )}
         {paginaActual === 'stats' && <PaginaStats />}
         {paginaActual === 'mvp' && <PaginaMVP />}
-        {paginaActual === 'noticias' && <PaginaNoticias />}
+        {paginaActual === 'noticias' && (
+          <PaginaNoticias
+            club={jugadorActual?.club?.trim() || null}
+            onIrAPerfil={jugadorActual ? () => setPantallaExtra('perfil') : null}
+          />
+        )}
       </main>
 
       <Navbar paginaActual={paginaActual} onCambiarPagina={setPaginaActual} />

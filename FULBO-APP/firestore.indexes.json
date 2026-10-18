@@ -1,0 +1,22 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "notificaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "destinatario_uid", "order": "ASCENDING" },
+        { "fieldPath": "creada_en", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notificaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "grupo_id", "order": "ASCENDING" },
+        { "fieldPath": "destinatario_uid", "order": "ASCENDING" },
+        { "fieldPath": "creada_en", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

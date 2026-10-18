@@ -5,11 +5,29 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { refSolicitud } from '../firebase/grupos'
+import { notificar, mensajes } from '../firebase/notificaciones'
+import { useAuth } from '../context/AuthContext'
+import { useGrupo } from '../context/GrupoContext'
 
 // Solicitudes de ingreso al grupo de cuentas de Google sin jugador vinculado
 export function useSolicitudes(grupoId) {
   const [solicitudes, setSolicitudes] = useState([])
   const [cargando, setCargando] = useState(true)
+  const { usuario } = useAuth()
+  const { grupoActivo } = useGrupo()
+  const grupoNombre = grupoActivo?.nombre ?? ''
+
+  function avisar(solicitud, tipo, mensaje, jugadorId = null) {
+    return notificar({
+      grupoId,
+      grupoNombre,
+      tipo,
+      mensaje,
+      autorUid: usuario.uid,
+      destinatarioUid: solicitud.uid,
+      jugadorId,
+    })
+  }
 
   useEffect(() => {
     if (!grupoId) return
@@ -51,13 +69,15 @@ export function useSolicitudes(grupoId) {
     batch.update(doc(db, 'jugadores', jugadorId), { uid_firebase: solicitud.uid })
     batch.update(refSolicitud(grupoId, solicitud.uid), { estado: 'vinculado' })
     await batch.commit()
+    await avisar(solicitud, 'solicitud_aprobada', mensajes.solicitudAprobada(grupoNombre), jugadorId)
   }
 
   // Para cuando el jugador se crea desde cero: se llama después de agregarJugador
-  async function marcarVinculada(solicitud) {
+  async function marcarVinculada(solicitud, jugadorId) {
     const batch = writeBatch(db)
     batch.update(refSolicitud(grupoId, solicitud.uid), { estado: 'vinculado' })
     await batch.commit()
+    await avisar(solicitud, 'solicitud_aprobada', mensajes.solicitudAprobada(grupoNombre), jugadorId)
   }
 
   async function rechazarSolicitud(solicitud) {
@@ -65,6 +85,7 @@ export function useSolicitudes(grupoId) {
     batch.delete(refSolicitud(grupoId, solicitud.uid))
     batch.update(doc(db, 'grupos', grupoId), { miembros_uids: arrayRemove(solicitud.uid) })
     await batch.commit()
+    await avisar(solicitud, 'solicitud_rechazada', mensajes.solicitudRechazada(grupoNombre))
   }
 
   return {

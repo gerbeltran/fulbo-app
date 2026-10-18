@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   collection, doc, getDoc, getDocs, addDoc, updateDoc,
-  deleteDoc, setDoc, query, where, serverTimestamp, Timestamp,
+  deleteDoc, setDoc, query, where, serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { generarEquipos } from '../utils/generadorEquipos'
+import { notificar, mensajes } from '../firebase/notificaciones'
+import { useAuth } from '../context/AuthContext'
+import { useGrupo } from '../context/GrupoContext'
+import {
+  CUPO_POR_DEFECTO, esTitular, esSuplente, ordenarPorInscripcion, baseVotacion,
+} from '../utils/suplentes'
 
 const colPartidos = collection(db, 'partidos')
 const colParticipaciones = collection(db, 'participaciones')
@@ -22,10 +28,38 @@ export function usePartido(jugadores, grupoId) {
   const [config, setConfig] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
+  const { usuario } = useAuth()
+  const { grupoActivo } = useGrupo()
+  // Las operaciones de asistencia van de a una: dos toques casi simultáneos
+  // (ej: el admin anotando jugadores rápido) leían el mismo conteo y se pasaban del cupo
+  const colaAsistencia = useRef(Promise.resolve())
+
+  function enCola(tarea) {
+    const resultado = colaAsistencia.current.then(tarea, tarea)
+    colaAsistencia.current = resultado.catch(() => {})
+    return resultado
+  }
 
   useEffect(() => {
     if (grupoId) cargar()
   }, [grupoId])
+
+  // Notificación para todos los miembros del grupo sobre un partido
+  function notificarGrupo(tipo, mensaje, partidoAvisado, datosExtra = {}) {
+    return notificar({
+      grupoId,
+      grupoNombre: grupoActivo?.nombre ?? '',
+      tipo,
+      mensaje,
+      autorUid: usuario.uid,
+      datosExtra: {
+        partido_id: partidoAvisado.id,
+        fecha: partidoAvisado.fecha?.toISOString?.() ?? null,
+        lugar: partidoAvisado.lugar ?? '',
+        ...datosExtra,
+      },
+    })
+  }
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
 
@@ -69,6 +103,7 @@ export function usePartido(jugadores, grupoId) {
         fecha: datos.fecha?.toDate?.() ?? null,
         creado_en: datos.creado_en?.toDate?.() ?? new Date(),
         combinacion_actual: datos.combinacion_actual ?? 0,
+        cupo_maximo: datos.cupo_maximo ?? CUPO_POR_DEFECTO,
       }
       setPartido(partidoData)
 
@@ -110,7 +145,7 @@ export function usePartido(jugadores, grupoId) {
 
   // ─── Ciclo de vida del partido ──────────────────────────────────────────────
 
-  async function abrirConvocatoria({ fecha, hora, lugar }) {
+  async function abrirConvocatoria({ fecha, hora, lugar, cupo = CUPO_POR_DEFECTO }) {
     if (partido) return
     const [anio, mes, dia] = fecha.split('-').map(Number)
     const [h, m] = hora.split(':').map(Number)
@@ -122,6 +157,7 @@ export function usePartido(jugadores, grupoId) {
       estado: 'abierto',
       duracion_min: 90,
       combinacion_actual: 0,
+      cupo_maximo: cupo,
       grupo_id: grupoId,
       creado_en: serverTimestamp(),
     })
@@ -132,12 +168,19 @@ export function usePartido(jugadores, grupoId) {
       estado: 'abierto',
       duracion_min: 90,
       combinacion_actual: 0,
+      cupo_maximo: cupo,
       grupo_id: grupoId,
       creado_en: new Date(),
     })
     setParticipaciones([])
     setEquiposCombinaciones([])
     setCombinacionConfirmada(null)
+
+    await notificarGrupo(
+      'nueva_convocatoria',
+      mensajes.nuevaConvocatoria(fechaHora, lugar.trim()),
+      { id: docRef.id, fecha: fechaHora, lugar: lugar.trim() }
+    )
   }
 
   async function reabrirConvocatoria() {
@@ -154,8 +197,12 @@ export function usePartido(jugadores, grupoId) {
   async function cerrarConvocatoria() {
     if (!partido) return
 
-    const confirmadosIds = participaciones
-      .filter((p) => p.confirmo_asistencia === true)
+    // Leemos del servidor: la lista en pantalla puede estar desactualizada.
+    // Solo titulares: confirmó asistencia y no es suplente.
+    const parts = await leerParticipaciones()
+    setParticipaciones(parts)
+    const confirmadosIds = parts
+      .filter(esTitular)
       .map((p) => p.jugador_id)
 
     const jugadoresConfirmados = jugadores
@@ -184,6 +231,8 @@ export function usePartido(jugadores, grupoId) {
     setEquiposCombinaciones(combinaciones)
     setCombinacionConfirmada(null)
     setPartido((prev) => ({ ...prev, estado: 'votando', combinacion_actual: 0 }))
+
+    await notificarGrupo('votacion_equipos', mensajes.votacionEquipos(partido.fecha), partido)
   }
 
   async function borrarConvocatoria() {
@@ -209,31 +258,189 @@ export function usePartido(jugadores, grupoId) {
     setConfig(nuevaConfig)
   }
 
-  // ─── Asistencia ─────────────────────────────────────────────────────────────
+  // ─── Asistencia, cupo y suplentes ───────────────────────────────────────────
 
-  async function confirmarAsistencia(jugadorId, confirma) {
-    if (!partido) return
-    const existente = participaciones.find((p) => p.jugador_id === jugadorId)
-    if (existente) {
-      await updateDoc(doc(db, 'participaciones', existente.id), {
-        confirmo_asistencia: confirma,
-      })
-      setParticipaciones((prev) =>
-        prev.map((p) =>
-          p.id === existente.id ? { ...p, confirmo_asistencia: confirma } : p
-        )
+  // Leemos del servidor: otros pueden haber confirmado desde que cargó la pantalla
+  async function leerParticipaciones() {
+    const snap = await getDocs(
+      query(
+        colParticipaciones,
+        where('grupo_id', '==', grupoId),
+        where('partido_id', '==', partido.id)
       )
-    } else {
-      const nueva = {
-        partido_id: partido.id,
-        grupo_id: grupoId,
-        jugador_id: jugadorId,
-        confirmo_asistencia: confirma,
-        votos_equipos: {},
-      }
-      const docRef = await addDoc(colParticipaciones, nueva)
-      setParticipaciones((prev) => [...prev, { id: docRef.id, ...nueva }])
+    )
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  }
+
+  // Actualiza (o crea) la participación de un jugador y devuelve la lista nueva
+  async function guardarParticipacion(parts, jugadorId, cambios) {
+    const existente = parts.find((p) => p.jugador_id === jugadorId)
+    if (existente) {
+      await updateDoc(doc(db, 'participaciones', existente.id), cambios)
+      return parts.map((p) => (p.id === existente.id ? { ...p, ...cambios } : p))
     }
+    const nueva = {
+      partido_id: partido.id,
+      grupo_id: grupoId,
+      jugador_id: jugadorId,
+      votos_equipos: {},
+      es_suplente: false,
+      ...cambios,
+    }
+    const docRef = await addDoc(colParticipaciones, nueva)
+    return [...parts, { id: docRef.id, ...nueva }]
+  }
+
+  function confirmarAsistencia(jugadorId, confirma) {
+    return enCola(() => confirmarAsistencia_(jugadorId, confirma))
+  }
+
+  async function confirmarAsistencia_(jugadorId, confirma) {
+    if (!partido) return
+    const parts = await leerParticipaciones()
+    const existente = parts.find((p) => p.jugador_id === jugadorId)
+
+    // ── VOY ──
+    if (confirma) {
+      // Titulares actuales sin contarlo a él (por si ya estaba anotado)
+      const otrosTitulares = parts.filter(
+        (p) => esTitular(p) && p.jugador_id !== jugadorId
+      ).length
+      // Cada VOY renueva inscripto_en: el que vuelve a confirmar pasa al final
+      await guardarParticipacion(parts, jugadorId, {
+        confirmo_asistencia: true,
+        es_suplente: otrosTitulares >= partido.cupo_maximo,
+        inscripto_en: serverTimestamp(),
+      })
+      setParticipaciones(await corregirExcesoDeCupo(jugadorId))
+      return
+    }
+
+    // ── NO VOY ──
+    const eraTitular = !!existente && esTitular(existente)
+    const actualizadas = await guardarParticipacion(parts, jugadorId, {
+      confirmo_asistencia: false,
+      es_suplente: false,
+    })
+    setParticipaciones(actualizadas)
+
+    // Si se baja un suplente (o alguien que no había respondido) no se libera lugar
+    if (!eraTitular) return
+
+    // Un titular que se baja con los equipos ya armados
+    if (['votando', 'confirmado'].includes(partido.estado)) {
+      const nombre = jugadores.find((j) => j.id === jugadorId)?.nombre ?? 'un jugador'
+      await notificarGrupo('traidor', mensajes.traidor(nombre), partido, {
+        nombre_jugador: nombre,
+        jugador_id: jugadorId,
+      })
+    }
+
+    const { ascendidos } = await promoverSuplentes(actualizadas, partido.cupo_maximo)
+
+    // Votando equipos: con el suplente que entró se arman propuestas nuevas.
+    // Sin suplente, el admin decide si regenerar a mano.
+    if (partido.estado === 'votando' && ascendidos.length > 0) {
+      await regenerarPropuestas()
+    }
+  }
+
+  // Si otro dispositivo anotó a alguien en el mismo instante, los dos pueden
+  // haber entrado como titulares. Releemos ya con la hora del servidor y, si
+  // este jugador quedó fuera del cupo por orden de llegada, pasa a suplente.
+  async function corregirExcesoDeCupo(jugadorId) {
+    const parts = await leerParticipaciones()
+    const titulares = ordenarPorInscripcion(parts.filter(esTitular))
+    const posicion = titulares.findIndex((p) => p.jugador_id === jugadorId)
+    if (posicion < partido.cupo_maximo) return parts
+
+    const participacion = titulares[posicion]
+    await updateDoc(doc(db, 'participaciones', participacion.id), { es_suplente: true })
+    return parts.map((p) => (p.id === participacion.id ? { ...p, es_suplente: true } : p))
+  }
+
+  // Sube suplentes, en orden de inscripción, hasta completar el cupo.
+  // Devuelve la lista actualizada y los que ascendieron.
+  async function promoverSuplentes(parts, cupo) {
+    const lugaresLibres = cupo - parts.filter(esTitular).length
+    if (lugaresLibres <= 0) return { parts, ascendidos: [] }
+    const ascendidos = ordenarPorInscripcion(parts.filter(esSuplente)).slice(0, lugaresLibres)
+    if (ascendidos.length === 0) return { parts, ascendidos: [] }
+
+    const batch = writeBatch(db)
+    ascendidos.forEach((p) =>
+      batch.update(doc(db, 'participaciones', p.id), { es_suplente: false })
+    )
+    await batch.commit()
+
+    const idsAscendidos = ascendidos.map((p) => p.id)
+    const actualizadas = parts.map((p) =>
+      idsAscendidos.includes(p.id) ? { ...p, es_suplente: false } : p
+    )
+    setParticipaciones(actualizadas)
+
+    // Aviso personal al que sube y aviso general al grupo
+    await Promise.all(ascendidos.flatMap((p) => {
+      const nombre = jugadores.find((j) => j.id === p.jugador_id)?.nombre ?? 'Un suplente'
+      return [
+        avisarPasoATitular(p.jugador_id),
+        notificarGrupo('nuevo_titular', mensajes.nuevoTitular(nombre), partido, {
+          nombre_jugador: nombre,
+          jugador_id: p.jugador_id,
+        }),
+      ]
+    }))
+    return { parts: actualizadas, ascendidos }
+  }
+
+  async function avisarPasoATitular(jugadorId) {
+    const jugador = jugadores.find((j) => j.id === jugadorId)
+    // Sin cuenta de Google vinculada no tiene dónde verla
+    if (!jugador?.uid_firebase) return
+    await notificar({
+      grupoId,
+      grupoNombre: grupoActivo?.nombre ?? '',
+      tipo: 'paso_a_titular',
+      mensaje: mensajes.pasoATitular(partido.fecha),
+      autorUid: usuario.uid,
+      destinatarioUid: jugador.uid_firebase,
+      jugadorId,
+      datosExtra: {
+        partido_id: partido.id,
+        fecha: partido.fecha?.toISOString?.() ?? null,
+        lugar: partido.lugar ?? '',
+      },
+    })
+  }
+
+  // Admin: pasa un jugador anotado de suplente a titular o al revés (sin mirar el cupo)
+  function cambiarSuplente(jugadorId, pasaASuplente) {
+    return enCola(() => cambiarSuplente_(jugadorId, pasaASuplente))
+  }
+
+  async function cambiarSuplente_(jugadorId, pasaASuplente) {
+    if (!partido) return
+    const parts = await leerParticipaciones()
+    const participacion = parts.find((p) => p.jugador_id === jugadorId)
+    if (participacion?.confirmo_asistencia !== true) return
+
+    const actualizadas = await guardarParticipacion(parts, jugadorId, { es_suplente: pasaASuplente })
+    setParticipaciones(actualizadas)
+    if (!pasaASuplente) await avisarPasoATitular(jugadorId)
+  }
+
+  // Admin: cambia el cupo; si sube, entran los primeros suplentes
+  function cambiarCupo(nuevoCupo) {
+    return enCola(() => cambiarCupo_(nuevoCupo))
+  }
+
+  async function cambiarCupo_(nuevoCupo) {
+    if (!partido) return
+    await updateDoc(doc(db, 'partidos', partido.id), { cupo_maximo: nuevoCupo })
+    setPartido((prev) => ({ ...prev, cupo_maximo: nuevoCupo }))
+    const parts = await leerParticipaciones()
+    setParticipaciones(parts)
+    await promoverSuplentes(parts, nuevoCupo)
   }
 
   // ─── Votación de equipos ────────────────────────────────────────────────────
@@ -243,7 +450,8 @@ export function usePartido(jugadores, grupoId) {
 
     const combIdx = partido.combinacion_actual
     const existente = participaciones.find((p) => p.jugador_id === jugadorId)
-    if (!existente) return
+    // Solo votan los titulares: los suplentes no cuentan para el 80%
+    if (!existente || !esTitular(existente)) return
 
     await updateDoc(doc(db, 'participaciones', existente.id), {
       [`votos_equipos.${combIdx}`]: aprueba,
@@ -259,8 +467,8 @@ export function usePartido(jugadores, grupoId) {
   }
 
   async function verificarVotos(parts, combIdx) {
-    const confirmados = parts.filter((p) => p.confirmo_asistencia === true)
-    const total = confirmados.length
+    const confirmados = parts.filter(esTitular)
+    const total = baseVotacion(confirmados.length, partido.cupo_maximo)
     if (total === 0) return
 
     const aprobaron = confirmados.filter(
@@ -275,7 +483,7 @@ export function usePartido(jugadores, grupoId) {
       return
     }
     if (rechazaron >= 3) {
-      await avanzarCombinacion(parts)
+      await avanzarCombinacion()
     }
   }
 
@@ -286,6 +494,8 @@ export function usePartido(jugadores, grupoId) {
     await updateDoc(doc(db, 'partidos', partido.id), { estado: 'confirmado' })
     setCombinacionConfirmada(combIdx)
     setPartido((prev) => ({ ...prev, estado: 'confirmado' }))
+
+    await notificarGrupo('equipos_confirmados', mensajes.equiposConfirmados(partido.fecha), partido)
   }
 
   async function forzarCombinacion() {
@@ -293,8 +503,7 @@ export function usePartido(jugadores, grupoId) {
     await confirmarEquipos(partido.combinacion_actual)
   }
 
-  async function avanzarCombinacion(partsActuales) {
-    const parts = partsActuales ?? participaciones
+  async function avanzarCombinacion() {
     const siguienteIdx = partido.combinacion_actual + 1
 
     if (siguienteIdx < equiposCombinaciones.length) {
@@ -303,45 +512,52 @@ export function usePartido(jugadores, grupoId) {
       })
       setPartido((prev) => ({ ...prev, combinacion_actual: siguienteIdx }))
     } else {
-      const confirmadosIds = parts
-        .filter((p) => p.confirmo_asistencia === true)
-        .map((p) => p.jugador_id)
-      const jugadoresConfirmados = jugadores
-        .filter((j) => confirmadosIds.includes(j.id))
-        .map((j) => ({
-          id: j.id,
-          nombre: j.nombre,
-          nivel_general: j.nivel_general,
-          posicion_preferida: j.posicion_preferida,
-        }))
-
-      const nuevasCombinaciones = generarEquipos(jugadoresConfirmados)
-
-      await Promise.all(
-        parts.map((p) =>
-          updateDoc(doc(db, 'participaciones', p.id), { votos_equipos: {} })
-        )
-      )
-      setParticipaciones((prev) => prev.map((p) => ({ ...p, votos_equipos: {} })))
-
-      await setDoc(doc(db, 'equipo_partido', partido.id), {
-        partido_id: partido.id,
-        grupo_id: grupoId,
-        combinaciones: nuevasCombinaciones,
-        combinacion_confirmada: null,
-        creado_en: serverTimestamp(),
-      })
-      await updateDoc(doc(db, 'partidos', partido.id), { combinacion_actual: 0 })
-
-      setEquiposCombinaciones(nuevasCombinaciones)
-      setCombinacionConfirmada(null)
-      setPartido((prev) => ({ ...prev, combinacion_actual: 0 }))
+      await regenerarPropuestas()
     }
+  }
+
+  // Arma propuestas nuevas con los titulares actuales (leídos del servidor),
+  // borra todos los votos y deja el partido votando desde la primera combinación
+  async function regenerarPropuestas() {
+    const parts = await leerParticipaciones()
+    const titularesIds = parts.filter(esTitular).map((p) => p.jugador_id)
+    const jugadoresTitulares = jugadores
+      .filter((j) => titularesIds.includes(j.id))
+      .map((j) => ({
+        id: j.id,
+        nombre: j.nombre,
+        nivel_general: j.nivel_general,
+        posicion_preferida: j.posicion_preferida,
+      }))
+
+    const nuevasCombinaciones = generarEquipos(jugadoresTitulares)
+
+    await Promise.all(
+      parts.map((p) =>
+        updateDoc(doc(db, 'participaciones', p.id), { votos_equipos: {} })
+      )
+    )
+    setParticipaciones(parts.map((p) => ({ ...p, votos_equipos: {} })))
+
+    await setDoc(doc(db, 'equipo_partido', partido.id), {
+      partido_id: partido.id,
+      grupo_id: grupoId,
+      combinaciones: nuevasCombinaciones,
+      combinacion_confirmada: null,
+      creado_en: serverTimestamp(),
+    })
+    await updateDoc(doc(db, 'partidos', partido.id), { estado: 'votando', combinacion_actual: 0 })
+
+    setEquiposCombinaciones(nuevasCombinaciones)
+    setCombinacionConfirmada(null)
+    setPartido((prev) => ({ ...prev, estado: 'votando', combinacion_actual: 0 }))
   }
 
   // ─── Valores derivados ──────────────────────────────────────────────────────
 
-  const confirmados = participaciones.filter((p) => p.confirmo_asistencia === true)
+  // "confirmados" son los titulares: los suplentes no votan ni entran en los equipos
+  const confirmados = participaciones.filter(esTitular)
+  const suplentes = ordenarPorInscripcion(participaciones.filter(esSuplente))
   const combIdxActual = partido?.combinacion_actual ?? 0
   const aprobaron = confirmados.filter(
     (p) => p.votos_equipos?.[combIdxActual] === true
@@ -349,11 +565,12 @@ export function usePartido(jugadores, grupoId) {
   const rechazaron = confirmados.filter(
     (p) => p.votos_equipos?.[combIdxActual] === false
   ).length
-  const votosActuales = { aprobaron, rechazaron, total: confirmados.length }
+  const totalVotantes = baseVotacion(confirmados.length, partido?.cupo_maximo)
+  const votosActuales = { aprobaron, rechazaron, total: totalVotantes }
 
   const porcentajeAprobacion =
-    confirmados.length > 0
-      ? Math.round((aprobaron / confirmados.length) * 100)
+    totalVotantes > 0
+      ? Math.min(100, Math.round((aprobaron / totalVotantes) * 100))
       : 0
 
   const equipoActual =
@@ -378,6 +595,7 @@ export function usePartido(jugadores, grupoId) {
     cargando,
     error,
     confirmados,
+    suplentes,
     votosActuales,
     porcentajeAprobacion,
     deberiaAbrirSchedule,
@@ -388,6 +606,8 @@ export function usePartido(jugadores, grupoId) {
     cerrarConvocatoria,
     guardarConfig,
     confirmarAsistencia,
+    cambiarSuplente,
+    cambiarCupo,
     votarEquipos,
     forzarCombinacion,
     avanzarCombinacion,
