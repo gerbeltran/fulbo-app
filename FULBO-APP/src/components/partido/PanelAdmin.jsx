@@ -14,7 +14,7 @@ const hoy = new Date().toISOString().split('T')[0]
 // Contador − / + para el cupo (mínimo 2, máximo 30)
 function SelectorCupo({ valor, onCambiar }) {
   const estiloBoton =
-    'w-9 h-9 bg-[#1a1f2e] border border-[#2a3040] rounded-xl text-[#e0e6f0] text-lg hover:border-[#4caf50] disabled:opacity-40 transition-colors'
+    'w-9 h-9 bg-dark border border-white/[0.08] rounded-xl text-[#F0F6FC] text-lg hover:border-[#00E676] disabled:opacity-40 transition-colors'
   return (
     <div className="flex items-center gap-2">
       <button
@@ -26,7 +26,7 @@ function SelectorCupo({ valor, onCambiar }) {
       >
         −
       </button>
-      <span className="min-w-[3ch] text-center text-[#e0e6f0] font-semibold">{valor}</span>
+      <span className="min-w-[3ch] text-center text-[#F0F6FC] font-semibold">{valor}</span>
       <button
         type="button"
         onClick={() => onCambiar(Math.min(30, valor + 1))}
@@ -36,7 +36,7 @@ function SelectorCupo({ valor, onCambiar }) {
       >
         +
       </button>
-      <span className="text-xs text-[#6b7a8d]">({Math.floor(valor / 2)} vs {Math.ceil(valor / 2)})</span>
+      <span className="text-xs text-[#7D8590]">({Math.floor(valor / 2)} vs {Math.ceil(valor / 2)})</span>
     </div>
   )
 }
@@ -51,6 +51,7 @@ export default function PanelAdmin({
   onBorrarConvocatoria,
   onGuardarConfig,
   onCambiarCupo,
+  onAbrirCierrePartido,
 }) {
   const [formPartido, setFormPartido] = useState({
     fecha: hoy,
@@ -127,22 +128,22 @@ export default function PanelAdmin({
   function BtnBorrar() {
     if (confirmarBorrar) {
       return (
-        <div className="bg-[#3d1a1a] border border-[#5c2424] rounded-xl p-3 space-y-2">
-          <p className="text-sm text-[#ef9a9a] font-medium text-center">
+        <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-3 space-y-2">
+          <p className="text-sm text-[#F87171] font-medium text-center">
             ¿Borrar la convocatoria y todos sus datos?
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => setConfirmarBorrar(false)}
               disabled={borrando}
-              className="flex-1 py-2 border border-[#2a3040] text-[#8892a4] rounded-xl text-sm font-medium hover:bg-[#242b3d] disabled:opacity-50 transition-colors"
+              className="flex-1 py-2 border border-white/[0.08] text-[#8B949E] rounded-xl text-sm font-medium hover:bg-white/[0.04] disabled:opacity-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               onClick={handleBorrar}
               disabled={borrando}
-              className="flex-1 py-2 bg-[#5c2424] border border-[#7a2d2d] text-white rounded-xl text-sm font-semibold hover:bg-[#7a2d2d] disabled:opacity-50 transition-colors"
+              className="flex-1 py-2 bg-red-500/20 border border-red-500/50 text-white rounded-xl text-sm font-semibold hover:bg-red-500/30 disabled:opacity-50 transition-colors"
             >
               {borrando ? 'Borrando...' : 'Sí, borrar'}
             </button>
@@ -153,7 +154,7 @@ export default function PanelAdmin({
     return (
       <button
         onClick={() => setConfirmarBorrar(true)}
-        className="w-full border border-[#5c2424] text-[#ef9a9a] py-2 rounded-xl text-sm font-medium hover:bg-[#3d1a1a] transition-colors"
+        className="w-full border border-red-500/40 text-[#F87171] py-2 rounded-xl text-sm font-medium hover:bg-red-500/10 transition-colors"
       >
         🗑️ Borrar convocatoria
       </button>
@@ -161,17 +162,13 @@ export default function PanelAdmin({
   }
 
   return (
-    <div className="bg-[#1e2435] border border-[#2a3040] rounded-xl p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-base">⚙️</span>
-        <h3 className="font-semibold text-[#e0e6f0] text-sm">Panel admin</h3>
-      </div>
+    <div className="p-4 space-y-3">
 
       {/* ── Sin partido activo: formulario para crear convocatoria ── */}
       {!partido && (
         <div className="space-y-3">
           {deberiaAbrirSchedule && (
-            <div className="bg-[#1b3d22] text-[#4caf50] text-xs px-3 py-2 rounded-lg font-medium border border-[#2d5a3d]">
+            <div className="bg-neon/10 text-[#00E676] text-xs px-3 py-2 rounded-lg font-medium border border-neon/25">
               Es la hora programada de apertura.
             </div>
           )}
@@ -179,7 +176,7 @@ export default function PanelAdmin({
           <form onSubmit={handleAbrir} className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-medium text-[#8892a4] mb-1">
+                <label className="block text-xs font-medium text-[#8B949E] mb-1">
                   Fecha del partido
                 </label>
                 <input
@@ -189,12 +186,12 @@ export default function PanelAdmin({
                   onChange={(e) =>
                     setFormPartido((prev) => ({ ...prev, fecha: e.target.value }))
                   }
-                  className="w-full bg-[#1a1f2e] border border-[#2a3040] rounded-xl px-3 py-2 text-sm text-[#e0e6f0] focus:outline-none focus:ring-2 focus:ring-[#4caf50] focus:border-transparent"
+                  className="w-full bg-dark border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-[#F0F6FC] focus:outline-none focus:ring-2 focus:ring-[#00E676] focus:border-transparent"
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#8892a4] mb-1">
+                <label className="block text-xs font-medium text-[#8B949E] mb-1">
                   Hora del partido
                 </label>
                 <input
@@ -203,14 +200,14 @@ export default function PanelAdmin({
                   onChange={(e) =>
                     setFormPartido((prev) => ({ ...prev, hora: e.target.value }))
                   }
-                  className="w-full bg-[#1a1f2e] border border-[#2a3040] rounded-xl px-3 py-2 text-sm text-[#e0e6f0] focus:outline-none focus:ring-2 focus:ring-[#4caf50] focus:border-transparent"
+                  className="w-full bg-dark border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-[#F0F6FC] focus:outline-none focus:ring-2 focus:ring-[#00E676] focus:border-transparent"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#8892a4] mb-1">
+              <label className="block text-xs font-medium text-[#8B949E] mb-1">
                 Lugar
               </label>
               <input
@@ -220,15 +217,15 @@ export default function PanelAdmin({
                   setFormPartido((prev) => ({ ...prev, lugar: e.target.value }))
                 }
                 placeholder="Ej: Complejo La Cancha, Cancha 3"
-                className="w-full bg-[#1a1f2e] border border-[#2a3040] rounded-xl px-3 py-2 text-sm text-[#e0e6f0] placeholder-[#4a5568] focus:outline-none focus:ring-2 focus:ring-[#4caf50] focus:border-transparent"
+                className="w-full bg-dark border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-[#F0F6FC] placeholder-[#4a5568] focus:outline-none focus:ring-2 focus:ring-[#00E676] focus:border-transparent"
               />
               {errorForm && (
-                <p className="text-[#ef9a9a] text-xs mt-1">{errorForm}</p>
+                <p className="text-[#F87171] text-xs mt-1">{errorForm}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#8892a4] mb-1">
+              <label className="block text-xs font-medium text-[#8B949E] mb-1">
                 Cupo máximo de jugadores
               </label>
               <SelectorCupo
@@ -240,7 +237,7 @@ export default function PanelAdmin({
             <button
               type="submit"
               disabled={abriendo}
-              className="w-full bg-[#245c33] border border-[#2d7a3d] text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2d7a3d] disabled:opacity-50 transition-colors"
+              className="w-full bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors"
             >
               {abriendo ? 'Abriendo...' : 'Abrir convocatoria'}
             </button>
@@ -249,15 +246,15 @@ export default function PanelAdmin({
           {/* Config apertura programada */}
           <button
             onClick={() => setMostrandoConfig((v) => !v)}
-            className="w-full bg-[#1a1f2e] border border-[#2a3040] text-[#8892a4] py-2 rounded-xl text-sm font-medium hover:bg-[#242b3d] transition-colors"
+            className="w-full bg-dark border border-white/[0.08] text-[#8B949E] py-2 rounded-xl text-sm font-medium hover:bg-white/[0.04] transition-colors"
           >
             {mostrandoConfig ? 'Cerrar configuración' : '⏰ Programar apertura'}
           </button>
 
           {mostrandoConfig && (
-            <div className="bg-[#242b3d] rounded-xl p-4 border border-[#2a3040] space-y-4">
+            <div className="bg-white/[0.04] rounded-xl p-4 border border-white/[0.08] space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#8892a4]">
+                <span className="text-sm font-medium text-[#8B949E]">
                   Apertura automática
                 </span>
                 <button
@@ -265,7 +262,7 @@ export default function PanelAdmin({
                     setFormConfig((prev) => ({ ...prev, activa: !prev.activa }))
                   }
                   className={`relative w-11 h-6 rounded-full transition-colors ${
-                    formConfig.activa ? 'bg-[#4caf50]' : 'bg-[#2a3040]'
+                    formConfig.activa ? 'bg-[#00E676]' : 'bg-white/[0.08]'
                   }`}
                 >
                   <span
@@ -279,7 +276,7 @@ export default function PanelAdmin({
               {formConfig.activa && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-[#8892a4] mb-2">
+                    <label className="block text-sm font-medium text-[#8B949E] mb-2">
                       Día de la semana
                     </label>
                     <div className="grid grid-cols-5 gap-1">
@@ -295,8 +292,8 @@ export default function PanelAdmin({
                           }
                           className={`py-2 text-xs font-semibold rounded-lg border-2 transition-colors ${
                             formConfig.dia_semana === d.valor
-                              ? 'border-[#4caf50] bg-[#1b3d22] text-[#4caf50]'
-                              : 'border-[#2a3040] text-[#6b7a8d] hover:border-[#3a4050]'
+                              ? 'border-[#00E676] bg-neon/10 text-[#00E676]'
+                              : 'border-white/[0.08] text-[#7D8590] hover:border-white/[0.12]'
                           }`}
                         >
                           {d.etiqueta}
@@ -306,7 +303,7 @@ export default function PanelAdmin({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-[#8892a4] mb-1">
+                    <label className="block text-sm font-medium text-[#8B949E] mb-1">
                       Hora de apertura de la convocatoria
                     </label>
                     <input
@@ -318,7 +315,7 @@ export default function PanelAdmin({
                           hora_apertura: e.target.value,
                         }))
                       }
-                      className="w-full bg-[#1a1f2e] border border-[#2a3040] rounded-xl px-3 py-2.5 text-[#e0e6f0] focus:outline-none focus:ring-2 focus:ring-[#4caf50] focus:border-transparent"
+                      className="w-full bg-dark border border-white/[0.08] rounded-xl px-3 py-2.5 text-[#F0F6FC] focus:outline-none focus:ring-2 focus:ring-[#00E676] focus:border-transparent"
                     />
                   </div>
                 </>
@@ -327,7 +324,7 @@ export default function PanelAdmin({
               <button
                 onClick={handleGuardarConfig}
                 disabled={guardandoConfig}
-                className="w-full bg-[#245c33] border border-[#2d7a3d] text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2d7a3d] disabled:opacity-50 transition-colors"
+                className="w-full bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors"
               >
                 {guardandoConfig ? 'Guardando...' : 'Guardar configuración'}
               </button>
@@ -339,8 +336,8 @@ export default function PanelAdmin({
       {/* ── Partido abierto ── */}
       {partido?.estado === 'abierto' && (
         <div className="space-y-2">
-          <div className="bg-[#1a1f2e] border border-[#2a3040] rounded-xl p-3">
-            <p className="text-xs font-medium text-[#8892a4] mb-2">Cupo máximo de jugadores</p>
+          <div className="bg-dark border border-white/[0.08] rounded-xl p-3">
+            <p className="text-xs font-medium text-[#8B949E] mb-2">Cupo máximo de jugadores</p>
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <SelectorCupo valor={cupoEditado} onCambiar={setCupoEditado} />
@@ -349,19 +346,19 @@ export default function PanelAdmin({
                 <button
                   onClick={handleGuardarCupo}
                   disabled={guardandoCupo}
-                  className="bg-[#245c33] border border-[#2d7a3d] text-white px-3 py-2 rounded-xl text-xs font-semibold hover:bg-[#2d7a3d] disabled:opacity-50 transition-colors"
+                  className="bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 transition-colors"
                 >
                   {guardandoCupo ? 'Guardando...' : 'Guardar'}
                 </button>
               )}
             </div>
-            <p className="text-[#6b7a8d] mt-2" style={{ fontSize: '11px' }}>
+            <p className="text-[#7D8590] mt-2" style={{ fontSize: '11px' }}>
               Si lo subís, entran los primeros suplentes. Si lo bajás, los titulares actuales se quedan.
             </p>
           </div>
           <button
             onClick={onCerrarConvocatoria}
-            className="w-full bg-[#5c3a00] border border-[#7a5000] text-[#fb923c] py-2.5 rounded-xl text-sm font-semibold hover:bg-[#7a5000] transition-colors"
+            className="w-full bg-gold/15 border border-gold/40 text-[#F59E0B] py-2.5 rounded-xl text-sm font-semibold hover:bg-gold/25 transition-colors"
           >
             Cerrar convocatoria
           </button>
@@ -374,7 +371,7 @@ export default function PanelAdmin({
         <div className="space-y-2">
           <button
             onClick={onReabrirConvocatoria}
-            className="w-full bg-[#1e3a5f] border border-[#2a5a8f] text-[#60a5fa] py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2a5a8f] transition-colors"
+            className="w-full bg-blue-500/15 border border-blue-500/40 text-[#60a5fa] py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-500/25 transition-colors"
           >
             Reabrir convocatoria
           </button>
@@ -385,9 +382,22 @@ export default function PanelAdmin({
       {/* ── Equipos confirmados ── */}
       {partido?.estado === 'confirmado' && (
         <div className="space-y-2">
+          {/* Recién cuando el partido ya empezó */}
+          {partido.fecha && partido.fecha.getTime() < Date.now() ? (
+            <button
+              onClick={onAbrirCierrePartido}
+              className="w-full bg-neon text-dark font-bold py-2.5 rounded-xl text-sm hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 transition-all"
+            >
+              🏁 Cerrar partido
+            </button>
+          ) : (
+            <p className="text-[#7D8590] text-xs text-center">
+              Cuando pase la hora del partido vas a poder cerrarlo con el resultado.
+            </p>
+          )}
           <button
             onClick={onReabrirConvocatoria}
-            className="w-full bg-[#1e3a5f] border border-[#2a5a8f] text-[#60a5fa] py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2a5a8f] transition-colors"
+            className="w-full bg-blue-500/15 border border-blue-500/40 text-[#60a5fa] py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-500/25 transition-colors"
           >
             Reabrir convocatoria
           </button>

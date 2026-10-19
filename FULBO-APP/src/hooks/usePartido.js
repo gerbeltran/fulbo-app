@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   collection, doc, getDoc, getDocs, addDoc, updateDoc,
   deleteDoc, setDoc, query, where, serverTimestamp, Timestamp, writeBatch,
+  increment, runTransaction,
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { generarEquipos } from '../utils/generadorEquipos'
@@ -11,6 +12,8 @@ import { useGrupo } from '../context/GrupoContext'
 import {
   CUPO_POR_DEFECTO, esTitular, esSuplente, ordenarPorInscripcion, baseVotacion,
 } from '../utils/suplentes'
+import { camposAperturaMVP, notificarAperturaMVP, cerrarVotacionMVP } from '../firebase/mvp'
+import { useCierreAutomaticoMVP } from './useCierreAutomaticoMVP'
 
 const colPartidos = collection(db, 'partidos')
 const colParticipaciones = collection(db, 'participaciones')
@@ -19,6 +22,8 @@ const colParticipaciones = collection(db, 'participaciones')
 //   'abierto'    — convocatoria abierta, jugadores confirmando asistencia
 //   'votando'    — equipos generados, jugadores votando por la combinación actual
 //   'confirmado' — combinación aprobada y guardada
+//   'jugado'     — el admin lo cerró con el resultado (estado final, no se reabre).
+//                  Al cerrarlo se abre la votación MVP, que sigue en la pestaña MVP.
 
 export function usePartido(jugadores, grupoId) {
   const [partido, setPartido] = useState(null)
@@ -26,6 +31,8 @@ export function usePartido(jugadores, grupoId) {
   const [equiposCombinaciones, setEquiposCombinaciones] = useState([])
   const [combinacionConfirmada, setCombinacionConfirmada] = useState(null)
   const [config, setConfig] = useState(null)
+  // Partido jugado con la votación MVP abierta (para cerrarla sola a las 24 hs)
+  const [votacionMvpAbierta, setVotacionMvpAbierta] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
   const { usuario } = useAuth()
@@ -87,6 +94,13 @@ export function usePartido(jugadores, grupoId) {
       const partidoDoc = docsOrdenados.find((d) =>
         estadosActivos.includes(d.data().estado)
       )
+      const docMvp = docsOrdenados.find((d) => d.data().mvp_estado === 'abierta')
+      setVotacionMvpAbierta(docMvp ? {
+        id: docMvp.id,
+        ...docMvp.data(),
+        fecha: docMvp.data().fecha?.toDate?.() ?? null,
+        mvp_abierto_en: docMvp.data().mvp_abierto_en?.toDate?.() ?? null,
+      } : null)
 
       if (!partidoDoc) {
         setPartido(null)
@@ -553,6 +567,80 @@ export function usePartido(jugadores, grupoId) {
     setPartido((prev) => ({ ...prev, estado: 'votando', combinacion_actual: 0 }))
   }
 
+  // ─── Cierre del partido ─────────────────────────────────────────────────────
+
+  // Admin: guarda el resultado y quién asistió, suma las estadísticas de cada
+  // jugador y abre la votación MVP. Todo en una transacción: si dos dispositivos
+  // lo cierran a la vez, solo uno suma.
+  // asistencias = { [jugadorId]: true | false }
+  async function cerrarPartido({ golesEquipo1, golesEquipo2, asistencias }) {
+    if (!partido || partido.estado !== 'confirmado') return
+    const parts = await leerParticipaciones()
+    const idsEquipo1 = (equipoConfirmado?.equipo1 ?? []).map((j) => j.id)
+    const idsEquipo2 = (equipoConfirmado?.equipo2 ?? []).map((j) => j.id)
+    const diferencia = golesEquipo1 - golesEquipo2
+
+    // Ganó, empató o perdió (null si no estaba en ninguno de los dos equipos)
+    function resultadoDe(jugadorId) {
+      const enEquipo1 = idsEquipo1.includes(jugadorId)
+      if (!enEquipo1 && !idsEquipo2.includes(jugadorId)) return null
+      if (diferencia === 0) return 'partidos_empatados'
+      return (diferencia > 0) === enEquipo1 ? 'partidos_ganados' : 'partidos_perdidos'
+    }
+
+    // Solo jugadores que todavía existen (un borrado haría fallar la transacción)
+    const idsExistentes = jugadores.map((j) => j.id)
+    const asistieronIds = Object.keys(asistencias).filter(
+      (id) => asistencias[id] && idsExistentes.includes(id)
+    )
+
+    const refPartido = doc(db, 'partidos', partido.id)
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(refPartido)
+      if (snap.data()?.estado !== 'confirmado') {
+        throw new Error('El partido ya fue cerrado.')
+      }
+      tx.update(refPartido, {
+        estado: 'jugado',
+        resultado_equipo1: golesEquipo1,
+        resultado_equipo2: golesEquipo2,
+        diferencia_goles: diferencia,
+        cerrado_en: serverTimestamp(),
+        ...camposAperturaMVP(),
+      })
+      // Todas las participaciones del jugador (hay datos viejos duplicados)
+      parts
+        .filter((p) => p.jugador_id in asistencias)
+        .forEach((p) =>
+          tx.update(doc(db, 'participaciones', p.id), { asistio: asistencias[p.jugador_id] })
+        )
+      asistieronIds.forEach((id) => {
+        const cambios = { partidos_jugados: increment(1) }
+        const resultado = resultadoDe(id)
+        if (resultado) cambios[resultado] = increment(1)
+        tx.update(doc(db, 'jugadores', id), cambios)
+      })
+    })
+
+    await notificarAperturaMVP(partido, jugadores, asistieronIds, contextoMVP)
+    await cargar()
+  }
+
+  // ─── Votación MVP ───────────────────────────────────────────────────────────
+
+  const contextoMVP = {
+    grupoId,
+    grupoNombre: grupoActivo?.nombre ?? '',
+    autorUid: usuario.uid,
+    nombreDe: (id) => jugadores.find((j) => j.id === id)?.nombre ?? 'un jugador',
+  }
+
+  // Sin backend: el primero que abre la app pasadas las 24 hs la cierra
+  useCierreAutomaticoMVP(votacionMvpAbierta, async () => {
+    await cerrarVotacionMVP(votacionMvpAbierta, contextoMVP)
+    setVotacionMvpAbierta(null)
+  })
+
   // ─── Valores derivados ──────────────────────────────────────────────────────
 
   // "confirmados" son los titulares: los suplentes no votan ni entran en los equipos
@@ -611,5 +699,7 @@ export function usePartido(jugadores, grupoId) {
     votarEquipos,
     forzarCombinacion,
     avanzarCombinacion,
+    cerrarPartido,
+    votacionMvpAbierta,
   }
 }

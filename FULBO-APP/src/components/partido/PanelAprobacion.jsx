@@ -21,27 +21,27 @@ export default function PanelAprobacion({
   ).length
 
   return (
-    <div className="bg-[#1e2435] rounded-xl border border-[#2a3040] p-4 space-y-4">
-      <h3 className="font-semibold text-[#e0e6f0]">Aprobación de equipos</h3>
+    <div className="bg-card rounded-xl border border-white/[0.08] p-4 space-y-4">
+      <h3 className="font-semibold text-[#F0F6FC]">Aprobación de equipos</h3>
 
       {/* Barra de progreso */}
       <div>
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-[#8892a4]">
+          <span className="text-[#8B949E]">
             {totalAprobaron} de {totalConfirmados} aprueban
           </span>
           <span
             className={`font-bold ${
-              porcentajeAprobacion >= 80 ? 'text-[#4caf50]' : 'text-[#8892a4]'
+              porcentajeAprobacion >= 80 ? 'text-[#00E676]' : 'text-[#8B949E]'
             }`}
           >
             {porcentajeAprobacion}%
           </span>
         </div>
-        <div className="w-full bg-[#2a3040] rounded-full h-3 overflow-hidden">
+        <div className="w-full bg-white/[0.08] rounded-full h-3 overflow-hidden">
           <div
             className={`h-3 rounded-full transition-all duration-500 ${
-              porcentajeAprobacion >= 80 ? 'bg-[#4caf50]' : 'bg-[#f59e0b]'
+              porcentajeAprobacion >= 80 ? 'bg-[#00E676]' : 'bg-[#f59e0b]'
             }`}
             style={{ width: `${porcentajeAprobacion}%` }}
           />
@@ -49,11 +49,11 @@ export default function PanelAprobacion({
         {/* Marcador del 80% */}
         <div className="relative">
           <div
-            className="absolute top-0 w-0.5 h-2 bg-[#6b7a8d]"
+            className="absolute top-0 w-0.5 h-2 bg-[#7D8590]"
             style={{ left: '80%', transform: 'translateX(-50%)' }}
           />
           <div
-            className="absolute text-xs text-[#6b7a8d] mt-1"
+            className="absolute text-xs text-[#7D8590] mt-1"
             style={{ left: '80%', transform: 'translateX(-50%)' }}
           >
             80%
@@ -65,15 +65,15 @@ export default function PanelAprobacion({
       {/* Botones de voto */}
       {puedeVotar ? (
         <div>
-          <p className="text-sm text-[#8892a4] mb-2">Tu voto:</p>
+          <p className="text-sm text-[#8B949E] mb-2">Tu voto:</p>
           <div className="flex gap-2">
             <button
               onClick={() => onVotar(jugadorActualId, true)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                miVoto === true
-                  ? 'bg-[#245c33] border border-[#2d7a3d] text-white'
-                  : 'bg-[#242b3d] text-[#8892a4] hover:bg-[#1b3d22] hover:text-[#4caf50]'
-              }`}
+ miVoto === true
+ ? 'bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 '
+ : 'bg-white/[0.04] text-[#8B949E] hover:bg-neon/10 hover:text-[#00E676]'
+ }`}
             >
               👍 Apruebo
             </button>
@@ -81,8 +81,8 @@ export default function PanelAprobacion({
               onClick={() => onVotar(jugadorActualId, false)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                 miVoto === false
-                  ? 'bg-[#5c2424] border border-[#7a2d2d] text-white'
-                  : 'bg-[#242b3d] text-[#8892a4] hover:bg-[#3d1a1a] hover:text-[#ef9a9a]'
+                  ? 'bg-red-500/20 border border-red-500/50 text-white'
+                  : 'bg-white/[0.04] text-[#8B949E] hover:bg-red-500/10 hover:text-[#F87171]'
               }`}
             >
               👎 No apruebo
@@ -90,7 +90,7 @@ export default function PanelAprobacion({
           </div>
         </div>
       ) : (
-        <p className="text-sm text-[#6b7a8d] italic">
+        <p className="text-sm text-[#7D8590] italic">
           Solo votan los jugadores que confirmaron asistencia.
         </p>
       )}
@@ -100,7 +100,7 @@ export default function PanelAprobacion({
         <button
           onClick={onGenerar}
           disabled={generando}
-          className="w-full bg-[#245c33] border border-[#2d7a3d] text-white py-3 rounded-xl font-semibold hover:bg-[#2d7a3d] disabled:opacity-50 transition-colors"
+          className="w-full bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 py-3 rounded-xl font-semibold disabled:opacity-50 transition-colors"
         >
           {generando ? 'Generando equipos...' : '⚽ Generar equipos'}
         </button>

@@ -43,6 +43,11 @@ export function useJugadores(grupoId) {
   async function agregarJugador(datos) {
     const jugadorRef = doc(collection(db, 'jugadores'))
     const nuevo = {
+      // Estadísticas: solo se suman al cerrar partidos (o las ajusta el admin)
+      partidos_jugados: 0,
+      partidos_ganados: 0,
+      partidos_empatados: 0,
+      partidos_perdidos: 0,
       ...datos,
       uid_firebase: datos.uid_firebase ?? null,
       grupo_id: grupoId,

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
 const POSICION_ESTILOS = {
-  ARQ: 'bg-[#3d3000] text-[#f59e0b]',
-  DEF: 'bg-[#1e3a5f] text-[#60a5fa]',
+  ARQ: 'bg-gold/10 text-[#f59e0b]',
+  DEF: 'bg-blue-500/15 text-[#60a5fa]',
   MED: 'bg-[#2d1b5e] text-[#c084fc]',
   DEL: 'bg-[#5c1a1a] text-[#f87171]',
 }
@@ -15,7 +15,7 @@ function Avatar({ nombre }) {
     .join('')
     .toUpperCase()
   return (
-    <div className="w-8 h-8 rounded-full bg-[#245c33] flex items-center justify-center text-white font-bold text-xs shrink-0">
+    <div className="w-8 h-8 rounded-full bg-neon/15 border border-neon/40 flex items-center justify-center text-neon font-bold text-xs shrink-0">
       {iniciales}
     </div>
   )
@@ -26,8 +26,8 @@ function TarjetaEquipo({ nombre, colorBorde, colorFondo, jugadores }) {
   return (
     <div className={`rounded-xl border-2 ${colorBorde} ${colorFondo} p-4`}>
       <div className="flex justify-between items-center mb-3">
-        <h4 className="font-bold text-[#e0e6f0]">{nombre}</h4>
-        <span className="text-xs bg-[#1a1f2e]/60 px-2 py-1 rounded-lg font-semibold text-[#8892a4]">
+        <h4 className="font-bold text-[#F0F6FC]">{nombre}</h4>
+        <span className="text-xs bg-dark/60 px-2 py-1 rounded-lg font-semibold text-[#8B949E]">
           Nivel total: {nivelTotal}
         </span>
       </div>
@@ -35,7 +35,7 @@ function TarjetaEquipo({ nombre, colorBorde, colorFondo, jugadores }) {
         {jugadores.map((j) => (
           <div key={j.id} className="flex items-center gap-2">
             <Avatar nombre={j.nombre} />
-            <span className="text-sm text-[#e0e6f0] flex-1 truncate">
+            <span className="text-sm text-[#F0F6FC] flex-1 truncate">
               {j.nombre}
             </span>
             <span
@@ -45,7 +45,7 @@ function TarjetaEquipo({ nombre, colorBorde, colorFondo, jugadores }) {
             >
               {j.posicion_preferida}
             </span>
-            <span className="text-xs text-[#6b7a8d] shrink-0 w-8 text-right">
+            <span className="text-xs text-[#7D8590] shrink-0 w-8 text-right">
               ★{j.nivel_general}
             </span>
           </div>
@@ -60,7 +60,7 @@ export default function EquiposGenerados({ combinaciones }) {
 
   if (!combinaciones || combinaciones.length === 0) {
     return (
-      <div className="text-center py-8 text-[#6b7a8d]">
+      <div className="text-center py-8 text-[#7D8590]">
         <p>No hay equipos generados.</p>
       </div>
     )
@@ -74,11 +74,11 @@ export default function EquiposGenerados({ combinaciones }) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-[#e0e6f0] text-lg">⚽ Equipos generados</h3>
+        <h3 className="font-bold text-[#F0F6FC] text-lg">⚽ Equipos generados</h3>
         <span
           className={`text-sm font-semibold px-2.5 py-1 rounded-lg ${
             comb.diferencia === 0
-              ? 'bg-[#1b3d22] text-[#4caf50]'
+              ? 'bg-neon/10 text-[#00E676]'
               : 'bg-[#3d2a00] text-[#f59e0b]'
           }`}
         >
@@ -101,16 +101,16 @@ export default function EquiposGenerados({ combinaciones }) {
       />
 
       {/* Nivel total vs */}
-      <div className="flex items-center justify-center gap-3 text-sm text-[#8892a4]">
+      <div className="flex items-center justify-center gap-3 text-sm text-[#8B949E]">
         <span className="font-bold text-[#60a5fa]">{niv1}</span>
         <span>vs</span>
-        <span className="font-bold text-[#fb923c]">{niv2}</span>
+        <span className="font-bold text-[#F59E0B]">{niv2}</span>
       </div>
 
       {/* Navegación entre alternativas */}
       {combinaciones.length > 1 && (
         <div>
-          <p className="text-xs text-[#6b7a8d] text-center mb-2">
+          <p className="text-xs text-[#7D8590] text-center mb-2">
             {combinaciones.length} combinaciones alternativas:
           </p>
           <div className="flex gap-1.5 flex-wrap justify-center">
@@ -119,10 +119,10 @@ export default function EquiposGenerados({ combinaciones }) {
                 key={i}
                 onClick={() => setIndice(i)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  i === indice
-                    ? 'bg-[#245c33] border border-[#2d7a3d] text-white'
-                    : 'bg-[#242b3d] text-[#8892a4] hover:bg-[#2a3040]'
-                }`}
+ i === indice
+ ? 'bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 '
+ : 'bg-white/[0.04] text-[#8B949E] hover:bg-white/[0.08]'
+ }`}
               >
                 #{i + 1} · dif {c.diferencia}
               </button>

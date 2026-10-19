@@ -20,6 +20,7 @@ export const DESTINO_POR_TIPO = {
   votacion_equipos: 'partido',
   equipos_confirmados: 'partido',
   votacion_mvp: 'mvp',
+  mvp_ganador: 'mvp',
   traidor: 'partido',
   paso_a_titular: 'partido',
   nuevo_titular: 'partido',
@@ -33,6 +34,7 @@ export const ICONO_POR_TIPO = {
   votacion_equipos: '🗳️',
   equipos_confirmados: '⚽',
   votacion_mvp: '🏆',
+  mvp_ganador: '🏆',
   traidor: '⚖️',
   paso_a_titular: '🎉',
   nuevo_titular: '🔄',
@@ -61,8 +63,11 @@ export const mensajes = {
     `Ya podés votar por los equipos para el partido del ${fechaLegible(fecha)}.`,
   equiposConfirmados: (fecha) =>
     `¡Equipos confirmados para el partido del ${fechaLegible(fecha)}! Entrá a ver cómo quedaron.`,
+  // El 🏆 ya lo pone el ícono del tipo de notificación
   votacionMvp: (fecha) =>
-    `Ya podés votar al MVP del partido del ${fechaLegible(fecha)}.`,
+    `¡Votá al MVP del partido del ${fechaLegible(fecha)}! Tenés 24hs.`,
+  mvpGanador: (fecha, nombre) =>
+    `¡El MVP del partido del ${fechaLegible(fecha)} es ${nombre}!`,
   pasoATitular: (fecha) =>
     `¡Pasaste a titular! Un lugar se liberó para el partido del ${fechaLegible(fecha)}.`,
   nuevoTitular: (nombre) =>

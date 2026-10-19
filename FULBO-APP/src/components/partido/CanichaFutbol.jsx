@@ -1,34 +1,69 @@
-// Cancha vertical (pensada para mobile): Equipo 2 arriba, Equipo 1 abajo
-const W = 320, H = 520
-const FX = 12, FY = 14, FW = 296, FH = 492
-const CX = FX + FW / 2   // 160
-const CY = FY + FH / 2   // 260
+import { useState } from 'react'
 
-const LINE = 'rgba(255,255,255,0.85)'
-const STRIPES = ['#15803d', '#166534']
-const COLORES_EQUIPO = {
-  A: { camiseta: '#3B82F6', pantalon: '#1E3A5F' },
-  B: { camiseta: '#EF4444', pantalon: '#7F1D1D' },
-}
-const COLOR_PIEL = '#F5CBA7'
-const COLOR_PELO = '#3B2A20'
-const COLOR_BOTINES = '#1a1a1a'
-const CONTORNO = 'rgba(0,0,0,0.55)'
+// Cancha vertical en perspectiva (estilo videojuego): Equipo 2 al fondo,
+// Equipo 1 adelante. Las posiciones se calculan en coordenadas de cancha
+// (u = ancho 0..1, v = largo 0..1 de arriba hacia abajo) y se proyectan.
+const W = 380, H = 440
+const ARRIBA = 18, ABAJO = 404        // bordes superior e inferior del campo en pantalla
+const ANCHO_ARRIBA = 252, ANCHO_ABAJO = 360
+const CX = W / 2
+const ESPESOR = 14                     // borde inferior que da efecto de "bloque"
+const FUGA = 0.35                      // cuánto se comprime el fondo de la cancha
+const LARGO_RELATIVO = 1.45            // largo de la cancha respecto del ancho
+
+const LINE = 'rgba(255,255,255,0.55)'
+const COLOR_EQUIPO = { A: '#3B82F6', B: '#EF4444' }
 const FUENTE = 'system-ui,-apple-system,sans-serif'
 
 // Ordenamiento defensivo→ofensivo para armar las líneas
 const POS_ORDER = { ARQ: 0, DEF: 1, MED: 2, DEL: 3 }
 
-// Distancia de cada línea a la mitad de cancha (en unidades del viewBox).
-// Cada jugador (figura + nombre) ocupa ~78 unidades de alto.
-const DISTANCIA_ARQUERO = 204
-const DISTANCIAS_LINEAS = {
-  1: [104],
-  2: [124, 46],
-  3: [150, 98, 46],
+// Profundidad (v) de cada línea para el equipo de adelante (A); el de atrás es espejo
+// (calculadas para que avatar + etiqueta de una línea no pisen a la siguiente)
+const V_ARQUERO = 0.95
+const V_LINEAS = {
+  1: [0.7],
+  2: [0.76, 0.58],
+  3: [0.8, 0.68, 0.56],
 }
-// Con 3 líneas (equipos de 8 o más) no entra a tamaño completo
-const ESCALA_POR_LINEAS = { 0: 1, 1: 1, 2: 1, 3: 0.68 }
+
+// ─── Proyección ───────────────────────────────────────────────────────────────
+
+function profundidad(v) {
+  return (v * (1 + FUGA)) / (1 + FUGA * v)
+}
+function anchoEn(v) {
+  return ANCHO_ARRIBA + (ANCHO_ABAJO - ANCHO_ARRIBA) * profundidad(v)
+}
+function proyectar(u, v) {
+  return {
+    x: CX + (u - 0.5) * anchoEn(v),
+    y: ARRIBA + (ABAJO - ARRIBA) * profundidad(v),
+  }
+}
+// Tamaño relativo de lo que está a esa profundidad (1 = adelante de todo)
+function escalaEn(v) {
+  return anchoEn(v) / ANCHO_ABAJO
+}
+function puntos(lista) {
+  return lista.map(([u, v]) => {
+    const p = proyectar(u, v)
+    return `${p.x.toFixed(1)},${p.y.toFixed(1)}`
+  }).join(' ')
+}
+function rectangulo(u1, v1, u2, v2) {
+  return puntos([[u1, v1], [u2, v1], [u2, v2], [u1, v2]])
+}
+// Círculo en la cancha (radio en unidades de ancho) → polígono proyectado
+function circulo(uc, vc, radio, desde = 0, hasta = 2 * Math.PI) {
+  const pasos = 48
+  return puntos(Array.from({ length: pasos + 1 }, (_, i) => {
+    const a = desde + ((hasta - desde) * i) / pasos
+    return [uc + radio * Math.cos(a), vc + (radio * Math.sin(a)) / LARGO_RELATIVO]
+  }))
+}
+
+// ─── Formación ────────────────────────────────────────────────────────────────
 
 // Arquero (o el más defensivo) + el resto repartido en 2 líneas, o 3 si son muchos.
 // Funciona con cualquier cantidad: 5 vs 5, 6 vs 5, etc.
@@ -51,145 +86,129 @@ function getFormacion(jugadores) {
     inicio += tamaño
   }
   return [
-    { distancia: DISTANCIA_ARQUERO, jugadores: [arquero] },
-    ...lineas.map((grupo, i) => ({
-      distancia: DISTANCIAS_LINEAS[cantidadLineas][i],
-      jugadores: grupo,
-    })),
+    { v: V_ARQUERO, jugadores: [arquero] },
+    ...lineas.map((grupo, i) => ({ v: V_LINEAS[cantidadLineas][i], jugadores: grupo })),
   ]
 }
 
-function nombreCorto(nombre, maxCaracteres) {
+function nombreCorto(nombre) {
   const primero = nombre.trim().split(' ')[0]
-  return primero.length > maxCaracteres ? primero.slice(0, maxCaracteres) + '...' : primero
+  return primero.length > 10 ? primero.slice(0, 10) + '...' : primero
 }
 
-// Silueta de jugador de frente, estilo infografía de videojuego de fútbol.
-// Centrada en x = 0; va de y = -37 (pelo) a y = 22 (botines).
-function SiluetaJugador({ colores }) {
-  const { camiseta, pantalon } = colores
+// ─── Jugador: avatar circular + etiqueta con el nombre ───────────────────────
+
+// Silueta genérica (busto) para quien no tiene foto
+function AvatarGenerico({ r }) {
   return (
-    <g strokeLinejoin="round">
-      {/* Sombra en el césped */}
-      <ellipse cy="22" rx="13" ry="2.8" fill="rgba(0,0,0,0.28)" />
-
-      {/* Piernas (levemente abiertas) */}
-      <path d="M-8.5,5 L-3.5,5 L-4.2,12 L-8.6,12 Z" fill={COLOR_PIEL} stroke={CONTORNO} strokeWidth="0.6" />
-      <path d="M8.5,5 L3.5,5 L4.2,12 L8.6,12 Z" fill={COLOR_PIEL} stroke={CONTORNO} strokeWidth="0.6" />
-
-      {/* Medias del color de la camiseta */}
-      <path d="M-8.6,11.5 L-4.2,11.5 L-4.6,19 L-9,19 Z" fill={camiseta} stroke={CONTORNO} strokeWidth="0.6" />
-      <path d="M8.6,11.5 L4.2,11.5 L4.6,19 L9,19 Z" fill={camiseta} stroke={CONTORNO} strokeWidth="0.6" />
-      <path d="M-8.7,13 L-4.3,13 M8.7,13 L4.3,13" stroke="rgba(255,255,255,0.7)" strokeWidth="0.9" />
-
-      {/* Botines */}
-      <path d="M-9.4,18.6 L-4.3,18.6 L-4.1,21.4 Q-4.1,22.4 -5.2,22.4 L-11.6,22.4 Q-12.6,22.4 -12.2,21.3 Q-11.3,19.6 -9.4,18.6 Z" fill={COLOR_BOTINES} />
-      <path d="M9.4,18.6 L4.3,18.6 L4.1,21.4 Q4.1,22.4 5.2,22.4 L11.6,22.4 Q12.6,22.4 12.2,21.3 Q11.3,19.6 9.4,18.6 Z" fill={COLOR_BOTINES} />
-
-      {/* Short con abertura central */}
-      <path d="M-10,-1.5 L10,-1.5 L11,6.2 L1.6,6.2 L0,3.4 L-1.6,6.2 L-11,6.2 Z" fill={pantalon} stroke={CONTORNO} strokeWidth="0.7" />
-
-      {/* Brazos levemente separados del cuerpo, con manos */}
-      <path d="M-15.2,-13 L-11.4,-12.2 L-12.4,-3.4 L-15.9,-3.9 Z" fill={COLOR_PIEL} stroke={CONTORNO} strokeWidth="0.6" />
-      <path d="M15.2,-13 L11.4,-12.2 L12.4,-3.4 L15.9,-3.9 Z" fill={COLOR_PIEL} stroke={CONTORNO} strokeWidth="0.6" />
-      <circle cx="-14.3" cy="-2.6" r="2" fill={COLOR_PIEL} stroke={CONTORNO} strokeWidth="0.6" />
-      <circle cx="14.3" cy="-2.6" r="2" fill={COLOR_PIEL} stroke={CONTORNO} strokeWidth="0.6" />
-
-      {/* Cuello */}
-      <path d="M-2.6,-26 L2.6,-26 L3,-21 L-3,-21 Z" fill={COLOR_PIEL} />
-
-      {/* Camiseta: hombros, mangas cortas y talle */}
+    <g>
+      <circle r={r} fill="#E5E7EB" />
+      <circle cy={-r * 0.22} r={r * 0.36} fill="#9CA3AF" />
       <path
-        d="M-4.2,-23.2 Q0,-21.6 4.2,-23.2 L11,-21.2 Q13.2,-20.4 13.8,-18 L15.6,-12.6 L11.2,-11.6 L10.2,-15 L9.6,-1 L-9.6,-1 L-10.2,-15 L-11.2,-11.6 L-15.6,-12.6 L-13.8,-18 Q-13.2,-20.4 -11,-21.2 Z"
-        fill={camiseta}
-        stroke={CONTORNO}
-        strokeWidth="0.8"
-      />
-      {/* Volumen: sombra lateral y puños */}
-      <path d="M4,-22 L11,-20.6 Q12.6,-20 13.2,-17.8 L14.6,-13.4 L11.4,-12.6 L10.2,-15 L9.6,-1 L4.5,-1 Q7,-12 4,-22 Z" fill="rgba(0,0,0,0.16)" />
-      <path d="M-15.6,-12.6 L-11.2,-11.6 M15.6,-12.6 L11.2,-11.6" stroke="rgba(255,255,255,0.75)" strokeWidth="1.1" />
-      {/* Cuello en V */}
-      <path d="M-4.2,-23.2 L0,-18.4 L4.2,-23.2" fill="none" stroke="white" strokeWidth="1.3" />
-
-      {/* Cabeza ovalada con orejas y pelo */}
-      <ellipse cx="-5.1" cy="-29.6" rx="1.1" ry="1.7" fill={COLOR_PIEL} stroke={CONTORNO} strokeWidth="0.5" />
-      <ellipse cx="5.1" cy="-29.6" rx="1.1" ry="1.7" fill={COLOR_PIEL} stroke={CONTORNO} strokeWidth="0.5" />
-      <path
-        d="M0,-36 Q5.2,-36 5.2,-30.5 Q5.2,-26.4 2.6,-24.6 Q0,-23.4 -2.6,-24.6 Q-5.2,-26.4 -5.2,-30.5 Q-5.2,-36 0,-36 Z"
-        fill={COLOR_PIEL}
-        stroke={CONTORNO}
-        strokeWidth="0.7"
-      />
-      <path
-        d="M-5.4,-30.2 Q-5.8,-37.2 0,-37.2 Q5.8,-37.2 5.4,-30.2 Q4.6,-33.4 2.2,-33.6 Q0,-33 -2.4,-33.8 Q-4.6,-33.4 -5.4,-30.2 Z"
-        fill={COLOR_PELO}
+        d={`M${-r * 0.72},${r * 0.86} Q${-r * 0.7},${r * 0.2} 0,${r * 0.2} Q${r * 0.7},${r * 0.2} ${r * 0.72},${r * 0.86} Z`}
+        fill="#9CA3AF"
       />
     </g>
   )
 }
 
-function NodoJugador({ jugador, colores, x, y, escala, maxCaracteres, voto, mostrarVoto }) {
+function NodoJugador({ jugador, color, x, y, escala, voto, mostrarVoto }) {
+  const [fotoRota, setFotoRota] = useState(false)
+  const r = 21
+  const idRecorte = `avatar-${jugador.id}`
+  const nombre = nombreCorto(jugador.nombre)
+  const anchoEtiqueta = nombre.length * 7.2 + 14
+  const conFoto = jugador.foto_url && !fotoRota
+
   return (
-    <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${escala})`}>
+    <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${escala.toFixed(3)})`}>
       <title>{jugador.nombre}</title>
-      <SiluetaJugador colores={colores} />
+      {/* Sombra en el césped */}
+      <ellipse cy={r + 3} rx={r * 0.9} ry="3.5" fill="rgba(0,0,0,0.35)" />
+
+      {/* Foto o silueta genérica, recortada en círculo */}
+      <defs>
+        <clipPath id={idRecorte}>
+          <circle r={r} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${idRecorte})`}>
+        {conFoto ? (
+          <>
+            <circle r={r} fill="#E5E7EB" />
+            <image
+              href={jugador.foto_url}
+              x={-r}
+              y={-r}
+              width={r * 2}
+              height={r * 2}
+              preserveAspectRatio="xMidYMid slice"
+              onError={() => setFotoRota(true)}
+            />
+          </>
+        ) : (
+          <AvatarGenerico r={r} />
+        )}
+      </g>
+
+      {/* Aro del color del equipo, con brillo */}
+      <circle r={r} fill="none" stroke={color} strokeWidth="3" style={{ filter: `drop-shadow(0 0 4px ${color})` }} />
 
       {/* Indicador de voto: ✓ votó / ○ falta */}
       {mostrarVoto && (
-        <g transform="translate(13,-31)">
-          <circle
-            r="5.5"
-            fill={voto ? '#22C55E' : 'rgba(0,0,0,0.45)'}
-            stroke="white"
-            strokeWidth="1"
-            strokeOpacity={voto ? 1 : 0.6}
-          />
+        <g transform={`translate(${r * 0.75},${-r * 0.75})`}>
+          <circle r="5.5" fill={voto ? '#22C55E' : '#1F2937'} stroke="white" strokeWidth="1.2" strokeOpacity={voto ? 1 : 0.6} />
           {voto && (
             <path d="M-2.5,0 L-0.7,2 L2.7,-2" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           )}
         </g>
       )}
 
-      {/* Nombre debajo, blanco con borde oscuro para leerse sobre el verde */}
+      {/* Nombre en etiqueta oscura debajo del avatar */}
+      <rect
+        x={-anchoEtiqueta / 2}
+        y={r + 4}
+        width={anchoEtiqueta}
+        height="17"
+        rx="5"
+        fill="rgba(13,17,23,0.88)"
+        stroke="rgba(255,255,255,0.14)"
+      />
       <text
-        y="37"
+        y={r + 16.5}
         textAnchor="middle"
         fill="white"
-        stroke="rgba(0,0,0,0.75)"
-        strokeWidth="3"
-        strokeLinejoin="round"
-        paintOrder="stroke"
         fontSize="12"
         fontWeight="700"
         fontFamily={FUENTE}
       >
-        {nombreCorto(jugador.nombre, maxCaracteres)}
+        {nombre}
       </text>
     </g>
   )
 }
 
-// equipo 'A' ocupa la mitad de abajo y 'B' la de arriba
+// Equipo 'A' juega adelante (mitad de abajo) y 'B' al fondo (mitad de arriba)
 function renderEquipo(jugadores, equipo, participaciones, combIdx, mostrarVoto) {
-  const sentido = equipo === 'A' ? 1 : -1
   const formacion = getFormacion(jugadores)
-  const escala = ESCALA_POR_LINEAS[formacion.length - 1] ?? 1
-  return formacion.flatMap(({ distancia, jugadores: linea }) => {
-    const y = CY + sentido * distancia
-    // Con más jugadores por línea, nombres más cortos para que no se pisen
-    const maxCaracteres = linea.length >= 4 ? 7 : 10
+  const masPorLinea = Math.max(0, ...formacion.map((l) => l.jugadores.length))
+  // Con muchos jugadores por línea, los avatares se achican para no pisarse
+  const ajuste = masPorLinea >= 4 || formacion.length > 3 ? 0.82 : 1
+
+  return formacion.flatMap(({ v: vA, jugadores: linea }) => {
+    const v = equipo === 'A' ? vA : 1 - vA
     return linea.map((j, i) => {
-      const x = FX + (FW * (i + 1)) / (linea.length + 1)
+      const u = 0.13 + (0.74 * (i + 0.5)) / linea.length
+      const { x, y } = proyectar(u, v)
       const partic = participaciones?.find((p) => p.jugador_id === j.id)
       return (
         <NodoJugador
           key={j.id}
           jugador={j}
-          colores={COLORES_EQUIPO[equipo]}
+          color={COLOR_EQUIPO[equipo]}
           x={x}
           y={y}
-          escala={escala}
-          maxCaracteres={maxCaracteres}
+          escala={escalaEn(v) * ajuste}
           voto={partic?.votos_equipos?.[combIdx] !== undefined}
           mostrarVoto={mostrarVoto}
         />
@@ -206,55 +225,72 @@ export default function CanichaFutbol({
   mostrarVotos = true,
 }) {
   const combIdx = combinacionActual ?? 0
-  const areaGrande = { w: FW * 0.56, h: FH * 0.13 }
-  const areaChica = { w: FW * 0.28, h: FH * 0.05 }
-  const arco = { w: 64, h: 8 }
+  const esquinaAbajoIzq = proyectar(0, 1)
+  const esquinaAbajoDer = proyectar(1, 1)
 
   return (
-    <div className="w-full max-w-sm mx-auto rounded-xl overflow-hidden shadow-md">
+    <div className="w-full max-w-md mx-auto">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
-        style={{ display: 'block' }}
+        style={{ display: 'block', filter: 'drop-shadow(0 12px 24px rgba(0,0,0,0.5))' }}
         aria-label="Cancha de fútbol con equipos"
       >
-        {/* Franjas de césped */}
+        <defs>
+          <linearGradient id="cesped" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1B7A3A" />
+            <stop offset="100%" stopColor="#25A04D" />
+          </linearGradient>
+          <radialGradient id="brilloCentral" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(160,255,190,0.35)" />
+            <stop offset="100%" stopColor="rgba(160,255,190,0)" />
+          </radialGradient>
+        </defs>
+
+        {/* Espesor del "bloque" de césped */}
+        <polygon
+          points={[
+            `${esquinaAbajoIzq.x},${esquinaAbajoIzq.y}`,
+            `${esquinaAbajoDer.x},${esquinaAbajoDer.y}`,
+            `${esquinaAbajoDer.x - 4},${esquinaAbajoDer.y + ESPESOR}`,
+            `${esquinaAbajoIzq.x + 4},${esquinaAbajoIzq.y + ESPESOR}`,
+          ].join(' ')}
+          fill="#0E4A22"
+        />
+
+        {/* Campo con franjas en perspectiva */}
+        <polygon points={rectangulo(0, 0, 1, 1)} fill="url(#cesped)" />
         {Array.from({ length: 10 }, (_, i) => (
-          <rect
+          <polygon
             key={i}
-            x={FX}
-            y={FY + (i * FH) / 10}
-            width={FW}
-            height={FH / 10}
-            fill={STRIPES[i % 2]}
+            points={rectangulo(0, i / 10, 1, (i + 1) / 10)}
+            fill={i % 2 ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.03)'}
           />
         ))}
+        {/* Brillo sutil en el centro */}
+        <ellipse cx={CX} cy={proyectar(0.5, 0.5).y} rx={anchoEn(0.5) * 0.5} ry="90" fill="url(#brilloCentral)" />
 
-        {/* Borde del campo */}
-        <rect x={FX} y={FY} width={FW} height={FH} fill="none" stroke={LINE} strokeWidth="1.5" />
-
-        {/* Línea y círculo central */}
-        <line x1={FX} y1={CY} x2={FX + FW} y2={CY} stroke={LINE} strokeWidth="1.5" />
-        <circle cx={CX} cy={CY} r="34" fill="none" stroke={LINE} strokeWidth="1.5" />
-        <circle cx={CX} cy={CY} r="3" fill={LINE} />
-
-        {/* Áreas grandes */}
-        <rect x={CX - areaGrande.w / 2} y={FY} width={areaGrande.w} height={areaGrande.h} fill="none" stroke={LINE} strokeWidth="1.5" />
-        <rect x={CX - areaGrande.w / 2} y={FY + FH - areaGrande.h} width={areaGrande.w} height={areaGrande.h} fill="none" stroke={LINE} strokeWidth="1.5" />
-
-        {/* Áreas chicas */}
-        <rect x={CX - areaChica.w / 2} y={FY} width={areaChica.w} height={areaChica.h} fill="none" stroke={LINE} strokeWidth="1.5" />
-        <rect x={CX - areaChica.w / 2} y={FY + FH - areaChica.h} width={areaChica.w} height={areaChica.h} fill="none" stroke={LINE} strokeWidth="1.5" />
-
-        {/* Puntos de penal */}
-        <circle cx={CX} cy={FY + FH * 0.095} r="2" fill={LINE} />
-        <circle cx={CX} cy={FY + FH * 0.905} r="2" fill={LINE} />
+        {/* Líneas */}
+        <g fill="none" stroke={LINE} strokeWidth="1.6" strokeLinejoin="round">
+          <polygon points={rectangulo(0.02, 0.015, 0.98, 0.985)} />
+          <polyline points={puntos([[0.02, 0.5], [0.98, 0.5]])} />
+          <polyline points={circulo(0.5, 0.5, 0.15)} />
+          {/* Áreas grandes y chicas */}
+          <polygon points={rectangulo(0.2, 0.015, 0.8, 0.17)} />
+          <polygon points={rectangulo(0.2, 0.83, 0.8, 0.985)} />
+          <polygon points={rectangulo(0.36, 0.015, 0.64, 0.065)} />
+          <polygon points={rectangulo(0.36, 0.935, 0.64, 0.985)} />
+          {/* Semicírculos del área */}
+          <polyline points={circulo(0.5, 0.17, 0.1, 0, Math.PI)} />
+          <polyline points={circulo(0.5, 0.83, 0.1, Math.PI, 2 * Math.PI)} />
+        </g>
+        <circle cx={CX} cy={proyectar(0.5, 0.5).y} r="2.5" fill={LINE} />
 
         {/* Arcos */}
-        <rect x={CX - arco.w / 2} y={FY - arco.h} width={arco.w} height={arco.h} fill="rgba(0,0,0,0.18)" stroke={LINE} strokeWidth="1.5" />
-        <rect x={CX - arco.w / 2} y={FY + FH} width={arco.w} height={arco.h} fill="rgba(0,0,0,0.18)" stroke={LINE} strokeWidth="1.5" />
+        <polygon points={rectangulo(0.42, -0.02, 0.58, 0.015)} fill="rgba(255,255,255,0.15)" stroke={LINE} strokeWidth="1.4" />
+        <polygon points={rectangulo(0.42, 0.985, 0.58, 1.02)} fill="rgba(255,255,255,0.15)" stroke={LINE} strokeWidth="1.4" />
 
-        {/* Jugadores */}
+        {/* Jugadores: primero los del fondo para que los de adelante queden encima */}
         {renderEquipo(equipo2, 'B', participaciones, combIdx, mostrarVotos)}
         {renderEquipo(equipo1, 'A', participaciones, combIdx, mostrarVotos)}
       </svg>

@@ -22,13 +22,23 @@ GRUPO:          id, nombre, codigo_invitacion (6 chars), admin_uid, miembros_uid
 CODIGO_INVITACION: id = código, grupo_id, grupo_nombre   (lookup por código)
 MIEMBRO_GRUPO:  id = {grupo_id}_{jugador_id}, grupo_id, jugador_id, rol (admin|jugador), unido_en
 JUGADOR:        id, grupo_id, uid_firebase (null hasta vincular, único por grupo), nombre, foto_url,
-                nivel_general (1-5), posicion_preferida (ARQ/DEF/MED/DEL), activo, club (opcional), creado_en
-PARTIDO:        id, grupo_id, fecha, lugar, estado, duracion_min, cupo_maximo (default 10), creado_en
+                nivel_general (1-5), posicion_preferida (ARQ/DEF/MED/DEL), activo, club (opcional), creado_en,
+                partidos_jugados, partidos_ganados, partidos_empatados, partidos_perdidos (default 0;
+                se suman solo al cerrar un partido, el admin puede ajustarlos a mano)
+PARTIDO:        id, grupo_id, fecha, lugar, estado (abierto → votando → confirmado → jugado), duracion_min,
+                cupo_maximo (default 10), creado_en,
+                resultado_equipo1, resultado_equipo2, diferencia_goles (equipo1 − equipo2), cerrado_en
+                (null hasta que el admin lo cierra; 'jugado' es final y no se reabre),
+                mvp_estado (null|abierta|cerrada), mvp_abierto_en, mvp_cerrado_en, mvp_cerrado_por,
+                mvp_ganador_jugador_id, mvp_resultados [{jugador_id, votos}]
 EQUIPO_PARTIDO: id = partido_id, grupo_id, combinaciones, combinacion_confirmada
 PARTICIPACION:  id, grupo_id, jugador_id, partido_id, confirmo_asistencia, es_suplente, inscripto_en,
-                votos_equipos, asistio, goles_marcados
+                votos_equipos, asistio, goles_marcados, voto_mvp (true = ya votó al MVP)
                 (titular = confirmó y no es suplente; solo los titulares votan y arman equipos)
-VOTO_MVP:       id, grupo_id, partido_id, votante_jugador_id, votado_jugador_id, creado_en
+                (asistio lo marca el admin al cerrar el partido; solo los que asistieron votan MVP)
+VOTO_MVP:       id = {partido_id}_{votante_jugador_id}, grupo_id, partido_id, votante_jugador_id,
+                votado_jugador_id, votante_participacion_id, votado_participacion_id, creado_en
+                (secreto hasta que mvp_estado = cerrada; un voto por jugador y partido)
 NOTICIA:        id, titulo, url_externa, fuente, imagen_url, publicada_en
 NOTIFICACION:   id, grupo_id, destinatario_uid (null = todo el grupo), jugador_id, tipo, mensaje,
                 autor_uid, leida_por[] (uids), creada_en, datos_extra (partido_id, fecha, lugar, ...)
@@ -57,6 +67,12 @@ NOTIFICACION:   id, grupo_id, destinatario_uid (null = todo el grupo), jugador_i
 
 ---
 
+## Cierre de partido
+- El admin cierra el partido (estado confirmado y fecha ya pasada) cargando el resultado y
+  quién asistió. En una transacción: partido → 'jugado', asistio en cada participación y
+  +1 a partidos_jugados y ganados/empatados/perdidos del jugador según su equipo.
+- Al cerrar se abre la votación MVP (24 hs), que sigue en la pestaña MVP.
+
 ## Reglas de negocio importantes
 - Los niveles los asigna **solo el admin** manualmente, nunca se auto-calculan
 - No hay drag & drop para intercambiar jugadores (Fase 1)
@@ -75,7 +91,7 @@ NOTIFICACION:   id, grupo_id, destinatario_uid (null = todo el grupo), jugador_i
 - [ ] Pantalla Partido: confirmación de asistencia
 - [ ] Generador de equipos con algoritmo definido
 - [ ] Pantalla Stats
-- [ ] Pantalla MVP: votación
+- [x] Pantalla MVP: votación
 - [ ] Pantalla Noticias: consumo de API externa
 
 ---

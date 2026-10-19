@@ -15,7 +15,7 @@ export default function BotonWhatsApp({ mensaje, etiqueta = 'Compartir por Whats
       href={linkWhatsApp(mensaje)}
       target="_blank"
       rel="noopener noreferrer"
-      className="w-full flex items-center justify-center gap-2 bg-[#1a1f2e] border border-[#25D366]/50 text-[#25D366] py-2.5 rounded-xl text-sm font-semibold hover:bg-[#25D366]/10 hover:border-[#25D366] transition-colors"
+      className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-dark py-2.5 rounded-lg text-sm font-bold hover:shadow-[0_0_18px_rgba(37,211,102,0.5)] hover:brightness-110 transition-all duration-200"
     >
       <LogoWhatsApp className="w-5 h-5 shrink-0" />
       {etiqueta}

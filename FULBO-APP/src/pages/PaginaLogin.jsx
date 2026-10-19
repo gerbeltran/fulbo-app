@@ -23,21 +23,21 @@ export default function PaginaLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1f2e] flex flex-col items-center justify-center px-6">
+    <div className="min-h-screen bg-dark flex flex-col items-center justify-center px-6">
       <div className="mb-10 text-center">
         <h1
           className="font-bold uppercase text-white"
           style={{ fontSize: '32px', letterSpacing: '0.15em' }}
         >
-          FUL<span style={{ color: '#4caf50' }}>BO</span>
+          FUL<span style={{ color: '#00E676' }}>BO</span>
         </h1>
-        <p className="text-[#6b8f74] mt-2 uppercase tracking-widest" style={{ fontSize: '11px' }}>
+        <p className="text-[#8B949E] mt-2 uppercase tracking-widest" style={{ fontSize: '11px' }}>
           Fútbol Amateur
         </p>
       </div>
 
-      <div className="w-full max-w-xs bg-[#1e2435] border border-[#2d5a3d] rounded-xl p-6 flex flex-col gap-4">
-        <p className="text-[#8892a4] text-sm text-center">
+      <div className="w-full max-w-xs bg-card border border-neon/25 rounded-xl p-6 flex flex-col gap-4">
+        <p className="text-[#8B949E] text-sm text-center">
           Ingresá con tu cuenta de Google para acceder a tu grupo
         </p>
 

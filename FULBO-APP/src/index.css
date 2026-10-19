@@ -1,6 +1,119 @@
 @import "tailwindcss";
 
+/* Sistema de diseño: colores disponibles como bg-neon, text-gold, border-neon/25, etc.
+   (Tailwind 4 toma la configuración de acá; no usa tailwind.config.js) */
+@theme {
+  --color-neon: #00E676;
+  --color-gold: #F59E0B;
+  --color-dark: #0D1117;
+  --color-card: #161B22;
+  --color-texto: #F0F6FC;
+  --color-texto-sec: #8B949E;
+}
+
 body {
-  background-color: #1a1f2e;
-  color: #e0e6f0;
+  background-color: #0D1117;
+  color: #F0F6FC;
+}
+
+@layer components {
+  /* Tarjeta con glassmorphism sutil */
+  .tarjeta-vidrio {
+    background: rgba(22, 27, 34, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(0, 230, 118, 0.06);
+  }
+
+  /* Botones */
+  .btn-primario {
+    background: #00E676;
+    color: #0D1117;
+    font-weight: 700;
+    border-radius: 8px;
+    transition: all 200ms;
+  }
+  .btn-primario:hover:not(:disabled) {
+    box-shadow: 0 0 18px rgba(0, 230, 118, 0.45);
+    filter: brightness(1.08);
+  }
+
+  .btn-secundario {
+    background: transparent;
+    color: #00E676;
+    border: 1px solid rgba(0, 230, 118, 0.6);
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 200ms;
+  }
+  .btn-secundario:hover:not(:disabled) {
+    background: rgba(0, 230, 118, 0.1);
+    box-shadow: 0 0 14px rgba(0, 230, 118, 0.2);
+  }
+
+  .btn-peligro {
+    background: transparent;
+    color: #F87171;
+    border: 1px solid rgba(248, 113, 113, 0.6);
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 200ms;
+  }
+  .btn-peligro:hover:not(:disabled) {
+    background: rgba(248, 113, 113, 0.1);
+  }
+
+  /* Botón de ícono del header (glass) */
+  .btn-vidrio {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 200ms;
+  }
+  .btn-vidrio:hover {
+    border-color: rgba(0, 230, 118, 0.5);
+    box-shadow: 0 0 12px rgba(0, 230, 118, 0.2);
+  }
+}
+
+/* ─── Celebración del MVP ──────────────────────────────────────────────────── */
+
+@keyframes revelar-mvp {
+  0% { opacity: 0; transform: scale(0.6) rotate(-4deg); }
+  60% { opacity: 1; transform: scale(1.06) rotate(1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes brillo-dorado {
+  0%, 100% { box-shadow: 0 0 18px rgba(245, 158, 11, 0.35); }
+  50% { box-shadow: 0 0 36px rgba(245, 158, 11, 0.7); }
+}
+
+@keyframes caer-confeti {
+  0% { opacity: 1; transform: translateY(-20px) rotate(0); }
+  100% { opacity: 0; transform: translateY(260px) rotate(540deg); }
+}
+
+.revelar-mvp {
+  animation: revelar-mvp 700ms cubic-bezier(0.2, 0.8, 0.3, 1.2) both,
+             brillo-dorado 2.4s ease-in-out 700ms infinite;
+}
+
+.confeti {
+  position: absolute;
+  top: 0;
+  width: 7px;
+  height: 12px;
+  border-radius: 2px;
+  animation: caer-confeti 2.2s ease-in forwards;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .revelar-mvp { animation: none; box-shadow: 0 0 24px rgba(245, 158, 11, 0.5); }
+  .confeti { display: none; }
 }

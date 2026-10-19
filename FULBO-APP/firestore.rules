@@ -49,6 +49,37 @@ service cloud.firestore {
       return request.resource.data.grupo_id == resource.data.grupo_id;
     }
 
+    function partidoDe(partidoId) {
+      return get(/databases/$(database)/documents/partidos/$(partidoId)).data;
+    }
+
+    function participacionDe(participacionId) {
+      return get(/databases/$(database)/documents/participaciones/$(participacionId)).data;
+    }
+
+    function rutaVotoMvp(partidoId, jugadorId) {
+      return /databases/$(database)/documents/votos_mvp/$(partidoId + '_' + jugadorId);
+    }
+
+    // Asistió: lo marca el admin al cerrar el partido.
+    // Misma condición que asistioAlPartido() en src/utils/mvp.js
+    function asistio(p) {
+      return p.get('asistio', false) == true;
+    }
+
+    function jugoElPartido(participacionId, jugadorId, partidoId) {
+      let p = participacionDe(participacionId);
+      return p.jugador_id == jugadorId && p.partido_id == partidoId && asistio(p);
+    }
+
+    // La foto de perfil se guarda comprimida dentro del jugador (data URL JPEG)
+    function fotoValida() {
+      return !('foto_url' in request.resource.data)
+        || request.resource.data.foto_url == null
+        || (request.resource.data.foto_url is string
+            && request.resource.data.foto_url.size() < 120000);
+    }
+
     // ─── Grupos ─────────────────────────────────────────────────────────────
 
     match /grupos/{grupoId} {
@@ -108,15 +139,16 @@ service cloud.firestore {
       allow read: if logueado()
         && (resource.data.uid_firebase == request.auth.uid || esMiembro(resource.data.grupo_id));
 
-      allow create: if esAdminDespues(request.resource.data.grupo_id);
+      allow create: if esAdminDespues(request.resource.data.grupo_id) && fotoValida();
 
       // Admin: todo, menos mover el jugador a otro grupo
-      allow update: if esAdmin(resource.data.grupo_id) && mantieneGrupo();
+      allow update: if esAdmin(resource.data.grupo_id) && mantieneGrupo() && fotoValida();
 
-      // Jugador: solo su propio perfil y sin tocar nivel, estado ni vinculación
+      // Jugador: solo su propio perfil y sin tocar nivel, estado, vinculación ni estadísticas
       allow update: if logueado()
         && resource.data.uid_firebase == request.auth.uid
-        && soloCambia(['nombre', 'posicion_preferida', 'foto_url', 'club']);
+        && soloCambia(['nombre', 'posicion_preferida', 'foto_url', 'club'])
+        && fotoValida();
 
       allow delete: if esAdmin(resource.data.grupo_id);
     }
@@ -138,10 +170,34 @@ service cloud.firestore {
       allow read: if esMiembro(resource.data.grupo_id);
       allow create: if esAdmin(request.resource.data.grupo_id);
 
-      // Los votos de cualquier jugador pueden avanzar la combinación o confirmar equipos
+      // Los votos de cualquier jugador pueden avanzar la combinación o confirmar equipos.
+      // Un partido 'jugado' (cerrado con resultado) no vuelve a otro estado.
       allow update: if mantieneGrupo()
+        && (resource.data.estado != 'jugado' || request.resource.data.estado == 'jugado')
         && (esAdmin(resource.data.grupo_id)
-            || (esMiembro(resource.data.grupo_id) && soloCambia(['estado', 'combinacion_actual'])));
+            || (esMiembro(resource.data.grupo_id)
+                && soloCambia(['estado', 'combinacion_actual'])
+                && request.resource.data.estado != 'jugado'));
+
+      // Votación MVP: cualquier miembro la cierra pasadas las 24 hs, o al completar
+      // los votos (mvp_cerrado_por = su jugador, que tiene que haber votado)
+      allow update: if mantieneGrupo()
+        && esMiembro(resource.data.grupo_id)
+        && soloCambia(['mvp_estado', 'mvp_cerrado_en', 'mvp_cerrado_por'])
+        && resource.data.get('mvp_estado', null) == 'abierta'
+        && request.resource.data.mvp_estado == 'cerrada'
+        && request.resource.data.mvp_cerrado_en == request.time
+        && (request.time >= resource.data.mvp_abierto_en + duration.value(24, 'h')
+            || (esMiJugador(request.resource.data.mvp_cerrado_por)
+                && exists(rutaVotoMvp(partidoId, request.resource.data.mvp_cerrado_por))));
+
+      // Ya cerrada, quien la cerró guarda el resultado (una sola vez)
+      allow update: if mantieneGrupo()
+        && esMiembro(resource.data.grupo_id)
+        && soloCambia(['mvp_resultados', 'mvp_ganador_jugador_id'])
+        && resource.data.get('mvp_estado', null) == 'cerrada'
+        && resource.data.get('mvp_resultados', null) == null
+        && request.resource.data.mvp_resultados is list;
 
       allow delete: if esAdmin(resource.data.grupo_id);
     }
@@ -166,7 +222,12 @@ service cloud.firestore {
             // Al regenerar combinaciones cualquier miembro reinicia los votos de todos
             || (esMiembro(resource.data.grupo_id)
                 && soloCambia(['votos_equipos'])
-                && request.resource.data.votos_equipos.size() == 0));
+                && request.resource.data.votos_equipos.size() == 0)
+            // Marca "ya voté al MVP", en el mismo batch que crea el voto
+            || (esMiJugador(resource.data.jugador_id)
+                && soloCambia(['voto_mvp'])
+                && request.resource.data.voto_mvp == true
+                && existsAfter(rutaVotoMvp(resource.data.partido_id, resource.data.jugador_id))));
 
       allow delete: if esAdmin(resource.data.grupo_id);
     }
@@ -184,11 +245,31 @@ service cloud.firestore {
       allow write: if esAdmin(grupoId);
     }
 
+    // id = {partido_id}_{votante_jugador_id}: como no se permite update,
+    // cada jugador puede votar una sola vez por partido
+    function votoMvpValido(v, votoId) {
+      let partido = partidoDe(v.partido_id);
+      return v.keys().hasOnly(['grupo_id', 'partido_id', 'votante_jugador_id', 'votado_jugador_id',
+                               'votante_participacion_id', 'votado_participacion_id', 'creado_en'])
+        && votoId == v.partido_id + '_' + v.votante_jugador_id
+        && v.creado_en == request.time
+        && v.votante_jugador_id != v.votado_jugador_id
+        && esMiJugador(v.votante_jugador_id)
+        && jugador(v.votante_jugador_id).grupo_id == v.grupo_id
+        && partido.grupo_id == v.grupo_id
+        && partido.get('mvp_estado', null) == 'abierta'
+        && request.time < partido.mvp_abierto_en + duration.value(24, 'h')
+        // Votante y votado tienen que haber jugado ese partido
+        && jugoElPartido(v.votante_participacion_id, v.votante_jugador_id, v.partido_id)
+        && jugoElPartido(v.votado_participacion_id, v.votado_jugador_id, v.partido_id);
+    }
+
     match /votos_mvp/{votoId} {
-      allow read: if esMiembro(resource.data.grupo_id);
-      allow create: if esMiembro(request.resource.data.grupo_id)
-        && esMiJugador(request.resource.data.votante_jugador_id)
-        && jugador(request.resource.data.votante_jugador_id).grupo_id == request.resource.data.grupo_id;
+      // Cada uno ve su voto; los de los demás, recién con la votación cerrada
+      allow read: if esMiembro(resource.data.grupo_id)
+        && (esMiJugador(resource.data.votante_jugador_id)
+            || partidoDe(resource.data.partido_id).get('mvp_estado', null) == 'cerrada');
+      allow create: if votoMvpValido(request.resource.data, votoId);
       allow update: if false;
       allow delete: if esAdmin(resource.data.grupo_id);
     }
@@ -214,15 +295,15 @@ service cloud.firestore {
         && request.resource.data.tipo in [
              'solicitud_pendiente', 'solicitud_aprobada', 'solicitud_rechazada',
              'nueva_convocatoria', 'votacion_equipos', 'equipos_confirmados',
-             'votacion_mvp', 'traidor', 'paso_a_titular', 'nuevo_titular'
+             'votacion_mvp', 'mvp_ganador', 'traidor', 'paso_a_titular', 'nuevo_titular'
            ]
         && esMiembro(request.resource.data.grupo_id)
         && (
           // El admin puede crear cualquier notificación de su grupo
           esAdmin(request.resource.data.grupo_id)
-          // Un jugador dispara estas al votar o al bajarse
+          // Un jugador dispara estas al votar, al bajarse o al cerrar la votación MVP
           || (request.resource.data.destinatario_uid == null
-              && request.resource.data.tipo in ['equipos_confirmados', 'traidor', 'nuevo_titular'])
+              && request.resource.data.tipo in ['equipos_confirmados', 'traidor', 'nuevo_titular', 'mvp_ganador'])
           // Al liberarse un lugar se avisa al suplente que sube (a su propia cuenta)
           || (request.resource.data.tipo == 'paso_a_titular'
               && jugador(request.resource.data.jugador_id).grupo_id == request.resource.data.grupo_id

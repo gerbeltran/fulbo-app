@@ -33,7 +33,7 @@ export default function PanelConfiguracion({ onAbrirPerfil, onCerrar }) {
   }
 
   const estiloBoton =
-    'w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-[#e0e6f0] border-t border-[#2a3040] hover:bg-[#242b3d] transition-colors'
+    'w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-[#F0F6FC] border-t border-white/[0.08] hover:bg-white/[0.04] transition-colors'
 
   return (
     <div
@@ -41,27 +41,27 @@ export default function PanelConfiguracion({ onAbrirPerfil, onCerrar }) {
       onClick={onCerrar}
     >
       <div
-        className="bg-[#1e2435] border border-[#2a3040] w-full sm:max-w-md rounded-t sm:rounded overflow-hidden"
+        className="bg-card border border-white/[0.08] w-full sm:max-w-md rounded-t sm:rounded overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Encabezado */}
         <div className="flex items-start justify-between px-4 pt-4 pb-3">
           <div className="min-w-0">
             <p
-              className="text-[#6b7a8d] uppercase font-semibold"
+              className="text-[#7D8590] uppercase font-semibold"
               style={{ fontSize: '10px', letterSpacing: '0.08em' }}
             >
               Grupo
             </p>
             <h2 className="text-white font-bold text-base truncate">{grupoActivo?.nombre}</h2>
-            <p className="text-[#81c784] text-xs mt-0.5">
+            <p className="text-[#00E676] text-xs mt-0.5">
               {esAdminDelGrupo ? '⚙️ Sos admin' : '👤 Jugador'}
               {jugadorActual && ` · ${jugadorActual.nombre}`}
             </p>
           </div>
           <button
             onClick={onCerrar}
-            className="p-1.5 text-[#6b7a8d] hover:text-[#e0e6f0] transition-colors"
+            className="p-1.5 text-[#7D8590] hover:text-[#F0F6FC] transition-colors"
             aria-label="Cerrar"
           >
             ✕
@@ -70,30 +70,30 @@ export default function PanelConfiguracion({ onAbrirPerfil, onCerrar }) {
 
         {/* Código de invitación (solo admin) */}
         {esAdminDelGrupo && codigo && (
-          <div className="mx-4 mb-4 bg-[#1a1f2e] border border-[#2d5a3d] rounded-lg p-3">
+          <div className="mx-4 mb-4 bg-dark border border-neon/25 rounded-lg p-3">
             <p
-              className="text-[#6b7a8d] uppercase font-semibold mb-1"
+              className="text-[#7D8590] uppercase font-semibold mb-1"
               style={{ fontSize: '10px', letterSpacing: '0.08em' }}
             >
               Código de invitación
             </p>
             <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-2xl text-[#4caf50] tracking-[0.3em] select-all">
+              <span className="font-mono text-2xl text-[#00E676] tracking-[0.3em] select-all">
                 {codigo}
               </span>
               <div className="flex gap-1.5 shrink-0">
                 <button
                   onClick={handleCopiar}
-                  className="bg-[#245c33] border border-[#2d7a3d] text-white px-3 py-1.5 uppercase font-semibold"
-                  style={{ fontSize: '10px', borderRadius: '3px' }}
+                  className="bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 px-3 py-1.5 uppercase font-semibold"
+                  style={{ fontSize: '10px', borderRadius: '8px' }}
                 >
                   {copiado ? '✓ Copiado' : 'Copiar'}
                 </button>
                 {typeof navigator.share === 'function' && (
                   <button
                     onClick={handleCompartir}
-                    className="border border-[#2d5a3d] text-[#81c784] px-3 py-1.5 uppercase font-semibold"
-                    style={{ fontSize: '10px', borderRadius: '3px' }}
+                    className="border border-neon/25 text-[#00E676] px-3 py-1.5 uppercase font-semibold"
+                    style={{ fontSize: '10px', borderRadius: '8px' }}
                   >
                     Compartir
                   </button>
@@ -103,9 +103,9 @@ export default function PanelConfiguracion({ onAbrirPerfil, onCerrar }) {
             <div className="mt-3">
               <BotonWhatsApp mensaje={mensajeInvitacion(codigo)} etiqueta="Invitar por WhatsApp" />
             </div>
-            <p className="text-[#6b7a8d] text-xs mt-2">
+            <p className="text-[#7D8590] text-xs mt-2">
               Quien entre con este código queda pendiente hasta que lo vincules
-              desde <span className="text-[#81c784]">Jugadores</span>.
+              desde <span className="text-[#00E676]">Jugadores</span>.
             </p>
           </div>
         )}
@@ -119,11 +119,11 @@ export default function PanelConfiguracion({ onAbrirPerfil, onCerrar }) {
         <button onClick={() => seleccionarGrupo(null)} className={estiloBoton}>
           <span>🔄</span> Cambiar de grupo
         </button>
-        <button onClick={cerrarSesion} className={`${estiloBoton} text-[#ef9a9a]`}>
+        <button onClick={cerrarSesion} className={`${estiloBoton} text-[#F87171]`}>
           <span>🚪</span>
           <span>
             Cerrar sesión
-            <span className="block text-[#6b7a8d] text-xs">{usuario?.email}</span>
+            <span className="block text-[#7D8590] text-xs">{usuario?.email}</span>
           </span>
         </button>
       </div>

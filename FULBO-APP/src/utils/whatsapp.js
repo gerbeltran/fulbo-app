@@ -1,4 +1,4 @@
-// Mensajes para compartir por WhatsApp con links wa.me (no requiere API)
+// Mensajes para compartir por WhatsApp con links api.whatsapp.com/send (no requiere API key)
 
 // Fija: en desarrollo window.location sería localhost
 export const URL_APP = 'https://futbol-amateur-app.web.app'
@@ -13,7 +13,7 @@ function fechaLegible(fecha) {
 
 // En mobile abre la app de WhatsApp; en desktop, WhatsApp Web
 export function linkWhatsApp(mensaje) {
-  return `https://wa.me/?text=${encodeURIComponent(mensaje)}`
+  return `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`
 }
 
 export function mensajeInvitacion(codigo) {
@@ -28,6 +28,12 @@ export function mensajeInvitacion(codigo) {
 export function mensajePartido(partido) {
   const fecha = fechaLegible(partido.fecha)
   const lugar = partido.lugar ?? ''
+  if (partido.mvp_estado === 'abierta') {
+    return (
+      `🏆 ¡Votá al MVP del partido del ${fecha}! Tenés 24hs.\n` +
+      `Accedé directo desde acá: ${URL_APP}`
+    )
+  }
   switch (partido.estado) {
     case 'abierto':
       return (
@@ -43,12 +49,6 @@ export function mensajePartido(partido) {
       return (
         `✅ ¡Equipos confirmados para el partido del ${fecha} en ${lugar}!\n` +
         `Entrá a ver cómo quedaron: ${URL_APP}`
-      )
-    // Todavía no existe este estado: queda listo para cuando se cierre el partido
-    case 'jugado':
-      return (
-        `🏆 ¡Votá al MVP del partido del ${fecha}!\n` +
-        `Accedé directo desde acá: ${URL_APP}`
       )
     default:
       return null

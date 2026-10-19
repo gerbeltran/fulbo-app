@@ -40,7 +40,7 @@ export default function CampanaNotificaciones() {
     <>
       <button
         onClick={handleAbrir}
-        className="relative text-[#6b7a8d] border border-[#2d5a3d] px-2 py-1.5 text-xs rounded hover:text-[#4caf50] hover:border-[#4caf50] transition-colors"
+        className="relative btn-vidrio px-2.5 py-2 text-sm"
         aria-label={
           cantidadNoLeidas > 0
             ? `Notificaciones: ${cantidadNoLeidas} sin leer`
@@ -65,19 +65,19 @@ export default function CampanaNotificaciones() {
           onClick={() => setAbierto(false)}
         >
           <div
-            className="bg-[#1e2435] border border-[#2a3040] w-full sm:max-w-md rounded-t sm:rounded max-h-[80vh] flex flex-col"
+            className="bg-card border border-white/[0.08] w-full sm:max-w-md rounded-t sm:rounded max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a3040]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
               <h2
-                className="font-bold text-[#e0e6f0] uppercase tracking-wider"
+                className="font-bold text-[#F0F6FC] uppercase tracking-wider"
                 style={{ fontSize: '13px' }}
               >
                 Notificaciones
               </h2>
               <button
                 onClick={() => setAbierto(false)}
-                className="p-1.5 text-[#6b7a8d] hover:text-[#e0e6f0] transition-colors"
+                className="p-1.5 text-[#7D8590] hover:text-[#F0F6FC] transition-colors"
                 aria-label="Cerrar"
               >
                 ✕
@@ -86,7 +86,7 @@ export default function CampanaNotificaciones() {
 
             <div className="overflow-y-auto">
               {notificaciones.length === 0 ? (
-                <div className="text-center py-12 text-[#6b7a8d]">
+                <div className="text-center py-12 text-[#7D8590]">
                   <div className="text-4xl mb-2">🔕</div>
                   <p className="text-sm">No tenés notificaciones</p>
                 </div>
@@ -99,14 +99,14 @@ export default function CampanaNotificaciones() {
                       key={n.id}
                       onClick={() => handleTocar(n)}
                       disabled={!navegable}
-                      className={`w-full text-left px-4 py-3 flex gap-3 border-b border-[#242b3d] transition-colors ${
-                        resaltada ? 'bg-[#1b3d22]/40' : ''
-                      } ${navegable ? 'hover:bg-[#242b3d]' : 'cursor-default'}`}
+                      className={`w-full text-left px-4 py-3 flex gap-3 border-b border-white/[0.05] transition-colors ${
+                        resaltada ? 'bg-neon/10' : ''
+                      } ${navegable ? 'hover:bg-white/[0.04]' : 'cursor-default'}`}
                     >
                       <span className="text-lg shrink-0">{ICONO_POR_TIPO[n.tipo] ?? '🔔'}</span>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-sm text-[#e0e6f0]">{n.mensaje}</span>
-                        <span className="block text-[#6b7a8d] mt-0.5" style={{ fontSize: '11px' }}>
+                        <span className="block text-sm text-[#F0F6FC]">{n.mensaje}</span>
+                        <span className="block text-[#7D8590] mt-0.5" style={{ fontSize: '11px' }}>
                           {hace(n.creada_en)}
                           {variosGrupos && n.datos_extra?.grupo_nombre && ` · ${n.datos_extra.grupo_nombre}`}
                         </span>

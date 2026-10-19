@@ -17,7 +17,7 @@ export default function PanelVotacionEquipos({
 }) {
   if (!equipo) {
     return (
-      <div className="text-center py-10 text-[#6b7a8d]">
+      <div className="text-center py-10 text-[#7D8590]">
         <div className="text-4xl mb-2">⚽</div>
         <p className="text-sm">Generando equipos...</p>
       </div>
@@ -35,12 +35,12 @@ export default function PanelVotacionEquipos({
         {estaConfirmado ? (
           <div className="flex items-center gap-2">
             <span className="text-lg">✅</span>
-            <h3 className="font-bold text-[#e0e6f0]">Equipos confirmados</h3>
+            <h3 className="font-bold text-[#F0F6FC]">Equipos confirmados</h3>
           </div>
         ) : (
           <div>
-            <h3 className="font-bold text-[#e0e6f0]">Propuesta de equipos</h3>
-            <p className="text-xs text-[#6b7a8d] mt-0.5">
+            <h3 className="font-bold text-[#F0F6FC]">Propuesta de equipos</h3>
+            <p className="text-xs text-[#7D8590] mt-0.5">
               Combinación {combinacionActual + 1} de {totalCombinaciones}
             </p>
           </div>
@@ -48,22 +48,22 @@ export default function PanelVotacionEquipos({
         <span
           className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${
             equipo.diferencia === 0
-              ? 'bg-[#1b3d22] text-[#4caf50]'
-              : 'bg-[#242b3d] text-[#8892a4]'
+              ? 'bg-neon/10 text-[#00E676]'
+              : 'bg-white/[0.04] text-[#8B949E]'
           }`}
         >
           Dif. {equipo.diferencia} pts
         </span>
       </div>
 
-      {/* Leyenda de equipos (en la cancha: Equipo 2 arriba, Equipo 1 abajo) */}
+      {/* Leyenda de equipos (en la cancha: Equipo 1 adelante, Equipo 2 al fondo) */}
       <div className="flex justify-between items-center text-xs font-semibold px-0.5">
         <span className="flex items-center gap-1.5 text-[#60a5fa]">
           <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6] inline-block shrink-0" />
-          Equipo 1 (abajo) — {niv1} pts
+          Equipo 1 — {niv1} pts
         </span>
         <span className="flex items-center gap-1.5 text-[#f87171]">
-          Equipo 2 (arriba) — {niv2} pts
+          Equipo 2 — {niv2} pts
           <span className="w-2.5 h-2.5 rounded-full bg-[#EF4444] inline-block shrink-0" />
         </span>
       </div>
@@ -79,42 +79,42 @@ export default function PanelVotacionEquipos({
 
       {/* Leyenda de voto (solo en estado votando) */}
       {!estaConfirmado && (
-        <p className="text-xs text-[#6b7a8d] text-center">
+        <p className="text-xs text-[#7D8590] text-center">
           ✓ votó · ○ pendiente
         </p>
       )}
 
       {/* Sección de votación */}
       {!estaConfirmado && (
-        <div className="bg-[#1e2435] rounded-xl border border-[#2a3040] p-3 space-y-3">
+        <div className="bg-card rounded-xl border border-white/[0.08] p-3 space-y-3">
           {/* Barra de progreso */}
           <div>
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-[#8892a4]">
+              <span className="text-[#8B949E]">
                 {votosActuales.aprobaron} de {votosActuales.total} aprueban
               </span>
               <span
                 className={`font-bold ${
-                  porcentajeAprobacion >= 80 ? 'text-[#4caf50]' : 'text-[#8892a4]'
+                  porcentajeAprobacion >= 80 ? 'text-[#00E676]' : 'text-[#8B949E]'
                 }`}
               >
                 {porcentajeAprobacion}%
               </span>
             </div>
-            <div className="relative w-full bg-[#2a3040] rounded-full h-3 overflow-visible">
+            <div className="relative w-full bg-white/[0.08] rounded-full h-3 overflow-visible">
               <div
                 className={`h-3 rounded-full transition-all duration-500 ${
-                  porcentajeAprobacion >= 80 ? 'bg-[#4caf50]' : 'bg-[#f59e0b]'
+                  porcentajeAprobacion >= 80 ? 'bg-[#00E676]' : 'bg-[#f59e0b]'
                 }`}
                 style={{ width: `${Math.min(porcentajeAprobacion, 100)}%` }}
               />
               {/* Marcador del 80% */}
               <div
-                className="absolute top-0 bottom-0 w-0.5 bg-[#6b7a8d] opacity-60"
+                className="absolute top-0 bottom-0 w-0.5 bg-[#7D8590] opacity-60"
                 style={{ left: '80%' }}
               />
             </div>
-            <p className="text-xs text-[#6b7a8d] mt-1">
+            <p className="text-xs text-[#7D8590] mt-1">
               Se necesita el 80% para confirmar estos equipos
             </p>
           </div>
@@ -122,17 +122,17 @@ export default function PanelVotacionEquipos({
           {/* Botones de voto */}
           {puedeVotar ? (
             <div>
-              <p className="text-xs font-semibold text-[#6b7a8d] uppercase tracking-wide mb-2">
+              <p className="text-xs font-semibold text-[#7D8590] uppercase tracking-wide mb-2">
                 Tu voto para esta combinación:
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={() => onVotar(true)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                    miVoto === true
-                      ? 'bg-[#245c33] border border-[#2d7a3d] text-white'
-                      : 'bg-[#242b3d] text-[#8892a4] hover:bg-[#1b3d22] hover:text-[#4caf50]'
-                  }`}
+ miVoto === true
+ ? 'bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 '
+ : 'bg-white/[0.04] text-[#8B949E] hover:bg-neon/10 hover:text-[#00E676]'
+ }`}
                 >
                   👍 Aprobar
                 </button>
@@ -140,8 +140,8 @@ export default function PanelVotacionEquipos({
                   onClick={() => onVotar(false)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                     miVoto === false
-                      ? 'bg-[#5c2424] border border-[#7a2d2d] text-white'
-                      : 'bg-[#242b3d] text-[#8892a4] hover:bg-[#3d1a1a] hover:text-[#ef9a9a]'
+                      ? 'bg-red-500/20 border border-red-500/50 text-white'
+                      : 'bg-white/[0.04] text-[#8B949E] hover:bg-red-500/10 hover:text-[#F87171]'
                   }`}
                 >
                   👎 Rechazar
@@ -149,27 +149,27 @@ export default function PanelVotacionEquipos({
               </div>
             </div>
           ) : (
-            <p className="text-xs text-[#6b7a8d] italic">
+            <p className="text-xs text-[#7D8590] italic">
               Solo pueden votar los jugadores que confirmaron asistencia.
             </p>
           )}
 
           {/* Botones admin */}
           {esAdmin && (
-            <div className="border-t border-[#2a3040] pt-3 space-y-2">
+            <div className="border-t border-white/[0.08] pt-3 space-y-2">
               <p className="text-xs font-semibold text-[#f59e0b] uppercase tracking-wide">
                 Acciones admin
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={onAvanzar}
-                  className="flex-1 py-2 border border-[#2a3040] text-[#8892a4] rounded-xl text-xs font-semibold hover:bg-[#242b3d] transition-colors"
+                  className="flex-1 py-2 border border-white/[0.08] text-[#8B949E] rounded-xl text-xs font-semibold hover:bg-white/[0.04] transition-colors"
                 >
                   Siguiente →
                 </button>
                 <button
                   onClick={onForzar}
-                  className="flex-1 py-2 bg-[#5c3a00] border border-[#7a5000] text-[#fb923c] rounded-xl text-xs font-semibold hover:bg-[#7a5000] transition-colors"
+                  className="flex-1 py-2 bg-gold/15 border border-gold/40 text-[#F59E0B] rounded-xl text-xs font-semibold hover:bg-gold/25 transition-colors"
                 >
                   🔧 Forzar esta
                 </button>

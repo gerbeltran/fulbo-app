@@ -62,14 +62,14 @@ export default function PaginaMisGrupos() {
 
   if (cargando) {
     return (
-      <div className="min-h-screen bg-[#1a1f2e] flex items-center justify-center">
-        <p className="text-[#6b7a8d] text-sm">Cargando grupos...</p>
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <p className="text-[#7D8590] text-sm">Cargando grupos...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1f2e] px-4 py-8">
+    <div className="min-h-screen bg-dark px-4 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -77,9 +77,9 @@ export default function PaginaMisGrupos() {
             className="font-bold uppercase text-white"
             style={{ fontSize: '20px', letterSpacing: '0.12em' }}
           >
-            FUL<span style={{ color: '#4caf50' }}>BO</span>
+            FUL<span style={{ color: '#00E676' }}>BO</span>
           </h1>
-          <p className="text-[#6b7a8d] mt-0.5" style={{ fontSize: '11px' }}>
+          <p className="text-[#7D8590] mt-0.5" style={{ fontSize: '11px' }}>
             {usuario?.email}
           </p>
         </div>
@@ -87,7 +87,7 @@ export default function PaginaMisGrupos() {
           <CampanaNotificaciones />
           <button
             onClick={cerrarSesion}
-            className="text-[#6b7a8d] text-xs hover:text-[#4caf50] border border-[#2d5a3d] px-3 py-1.5 rounded transition-colors"
+            className="text-[#7D8590] text-xs hover:text-[#00E676] border border-neon/25 px-3 py-1.5 rounded transition-colors"
           >
             Salir
           </button>
@@ -95,7 +95,7 @@ export default function PaginaMisGrupos() {
       </div>
 
       <p
-        className="text-[#6b7a8d] uppercase tracking-widest mb-3"
+        className="text-[#7D8590] uppercase tracking-widest mb-3"
         style={{ fontSize: '10px' }}
       >
         Mis grupos
@@ -107,8 +107,8 @@ export default function PaginaMisGrupos() {
 
       {/* Lista de grupos */}
       {misGrupos.length === 0 ? (
-        <div className="bg-[#1e2435] border border-[#2d5a3d] rounded-xl p-6 text-center mb-4">
-          <p className="text-[#6b7a8d] text-sm">No pertenecés a ningún grupo todavía.</p>
+        <div className="bg-card border border-neon/25 rounded-xl p-6 text-center mb-4">
+          <p className="text-[#7D8590] text-sm">No pertenecés a ningún grupo todavía.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3 mb-4">
@@ -116,23 +116,23 @@ export default function PaginaMisGrupos() {
             <button
               key={grupo.id}
               onClick={() => seleccionarGrupo(grupo.id)}
-              className="w-full bg-[#1e2435] border border-[#2d5a3d] rounded-xl p-4 text-left hover:border-[#4caf50] transition-colors flex items-center justify-between"
+              className="w-full bg-card border border-neon/25 rounded-xl p-4 text-left hover:border-[#00E676] transition-colors flex items-center justify-between"
             >
               <div>
                 <p className="text-white font-semibold text-sm">{grupo.nombre}</p>
                 <div className="flex items-center gap-3 mt-1">
                   {grupo.pendiente ? (
-                    <p className="text-[#fb923c] uppercase" style={{ fontSize: '10px' }}>
+                    <p className="text-[#F59E0B] uppercase" style={{ fontSize: '10px' }}>
                       ⏳ Pendiente de aprobación
                     </p>
                   ) : (
-                    <p className="text-[#6b7a8d] uppercase" style={{ fontSize: '10px' }}>
+                    <p className="text-[#7D8590] uppercase" style={{ fontSize: '10px' }}>
                       {grupo.mi_rol === 'admin' ? '⚙️ Admin' : '👤 Jugador'}
                     </p>
                   )}
                   {grupo.mi_rol === 'admin' && (
                     <span
-                      className="text-[#4caf50] font-mono tracking-widest"
+                      className="text-[#00E676] font-mono tracking-widest"
                       style={{ fontSize: '10px' }}
                     >
                       {grupo.codigo_invitacion}
@@ -140,7 +140,7 @@ export default function PaginaMisGrupos() {
                   )}
                 </div>
               </div>
-              <span className="text-[#4caf50] text-lg">→</span>
+              <span className="text-[#00E676] text-lg">→</span>
             </button>
           ))}
         </div>
@@ -151,13 +151,13 @@ export default function PaginaMisGrupos() {
         <div className="flex flex-col gap-3">
           <button
             onClick={() => { setModo('crear'); setError(null) }}
-            className="w-full bg-[#245c33] border border-[#2d7a3d] text-white py-3 rounded-xl font-semibold text-sm hover:bg-[#2d7a3d] transition-colors"
+            className="w-full bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 py-3 rounded-xl font-semibold text-sm transition-colors"
           >
             ⚽ Crear nuevo grupo
           </button>
           <button
             onClick={() => { setModo('unirse'); setError(null) }}
-            className="w-full bg-[#1e2435] border border-[#2d5a3d] text-white py-3 rounded-xl font-semibold text-sm hover:border-[#4caf50] transition-colors"
+            className="w-full bg-card border border-neon/25 text-white py-3 rounded-xl font-semibold text-sm hover:border-[#00E676] transition-colors"
           >
             🔗 Unirse con código
           </button>
@@ -166,7 +166,7 @@ export default function PaginaMisGrupos() {
 
       {/* Formulario crear */}
       {modo === 'crear' && (
-        <div className="bg-[#1e2435] border border-[#2d5a3d] rounded-xl p-4 flex flex-col gap-3">
+        <div className="bg-card border border-neon/25 rounded-xl p-4 flex flex-col gap-3">
           <h3 className="text-white font-semibold text-sm uppercase tracking-wide">
             Nuevo grupo
           </h3>
@@ -176,34 +176,34 @@ export default function PaginaMisGrupos() {
             placeholder="Nombre del grupo (ej: Los Pibes del Martes)"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="bg-[#1a1f2e] border border-[#2d5a3d] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4caf50] transition-colors"
+            className="bg-dark border border-neon/25 text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00E676] transition-colors"
             autoFocus
           />
 
           {/* Importación única de los datos previos al multi-grupo */}
           {jugadoresSinGrupo.length > 0 && (
-            <div className="bg-[#1a1f2e] border border-[#2d5a3d] rounded-lg p-3 flex flex-col gap-2">
-              <label className="flex items-start gap-2 text-sm text-[#e0e6f0] cursor-pointer">
+            <div className="bg-dark border border-neon/25 rounded-lg p-3 flex flex-col gap-2">
+              <label className="flex items-start gap-2 text-sm text-[#F0F6FC] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={importar}
                   onChange={(e) => setImportar(e.target.checked)}
-                  className="mt-0.5 accent-[#4caf50]"
+                  className="mt-0.5 accent-[#00E676]"
                 />
                 <span>
                   Importar los {jugadoresSinGrupo.length} jugadores y partidos cargados antes
-                  <span className="block text-[#6b7a8d] text-xs">
+                  <span className="block text-[#7D8590] text-xs">
                     Se hace una sola vez y quedan dentro de este grupo.
                   </span>
                 </span>
               </label>
               {importar && (
                 <div>
-                  <p className="text-[#8892a4] text-xs mb-1">¿Cuál de ellos sos vos?</p>
+                  <p className="text-[#8B949E] text-xs mb-1">¿Cuál de ellos sos vos?</p>
                   <select
                     value={jugadorPropioId}
                     onChange={(e) => setJugadorPropioId(e.target.value)}
-                    className="w-full bg-[#1e2435] border border-[#2d5a3d] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4caf50]"
+                    className="w-full bg-card border border-neon/25 text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00E676]"
                   >
                     <option value="">Ninguno — crear mi jugador nuevo</option>
                     {jugadoresSinGrupo.map((j) => (
@@ -218,14 +218,14 @@ export default function PaginaMisGrupos() {
           <div className="flex gap-2">
             <button
               onClick={() => { setModo(null); setError(null); setNombre('') }}
-              className="flex-1 border border-[#2d5a3d] text-[#6b7a8d] py-2.5 rounded-lg text-sm font-semibold"
+              className="flex-1 border border-neon/25 text-[#7D8590] py-2.5 rounded-lg text-sm font-semibold"
             >
               Cancelar
             </button>
             <button
               onClick={handleCrear}
               disabled={procesando || !nombre.trim()}
-              className="flex-1 bg-[#245c33] text-white py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+              className="flex-1 bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
             >
               {procesando ? 'Creando...' : 'Crear'}
             </button>
@@ -235,7 +235,7 @@ export default function PaginaMisGrupos() {
 
       {/* Formulario unirse */}
       {modo === 'unirse' && (
-        <div className="bg-[#1e2435] border border-[#2d5a3d] rounded-xl p-4 flex flex-col gap-3">
+        <div className="bg-card border border-neon/25 rounded-xl p-4 flex flex-col gap-3">
           <h3 className="text-white font-semibold text-sm uppercase tracking-wide">
             Código de invitación
           </h3>
@@ -246,20 +246,20 @@ export default function PaginaMisGrupos() {
             value={codigo}
             onChange={(e) => setCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             maxLength={6}
-            className="bg-[#1a1f2e] border border-[#2d5a3d] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4caf50] uppercase tracking-widest text-center font-mono transition-colors"
+            className="bg-dark border border-neon/25 text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00E676] uppercase tracking-widest text-center font-mono transition-colors"
             autoFocus
           />
           <div className="flex gap-2">
             <button
               onClick={() => { setModo(null); setError(null); setCodigo('') }}
-              className="flex-1 border border-[#2d5a3d] text-[#6b7a8d] py-2.5 rounded-lg text-sm font-semibold"
+              className="flex-1 border border-neon/25 text-[#7D8590] py-2.5 rounded-lg text-sm font-semibold"
             >
               Cancelar
             </button>
             <button
               onClick={handleUnirse}
               disabled={procesando || codigo.length < 6}
-              className="flex-1 bg-[#245c33] text-white py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+              className="flex-1 bg-neon text-dark font-bold hover:shadow-[0_0_18px_rgba(0,230,118,0.45)] hover:brightness-110 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
             >
               {procesando ? 'Uniéndome...' : 'Unirse'}
             </button>
