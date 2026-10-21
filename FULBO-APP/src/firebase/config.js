@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import {
   initializeAuth,
   indexedDBLocalPersistence,
@@ -18,7 +18,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const db = getFirestore(app);
+// iPhone/iPad (Safari y la PWA instalada): el canal de streaming de Firestore a veces
+// queda colgado y las lecturas no vuelven aunque las escrituras se guarden.
+// Long polling es un poco más lento pero funciona siempre.
+const esIOS =
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  // iPadOS se presenta como Mac
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+export const db = initializeFirestore(app, esIOS ? { experimentalForceLongPolling: true } : {});
 
 // Persistencia explícita: la sesión sobrevive a cerrar el navegador o la PWA.
 // Usa IndexedDB y, si no está disponible, localStorage.

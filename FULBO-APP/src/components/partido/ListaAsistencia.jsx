@@ -1,4 +1,4 @@
-import { CUPO_POR_DEFECTO, esTitular, esSuplente, ordenarPorInscripcion } from '../../utils/suplentes'
+import { CUPO_POR_DEFECTO, esTitular, esSuplente, ordenarPorInscripcion, unaPorJugador } from '../../utils/suplentes'
 
 const POS_ESTILOS = {
   ARQ: { background: '#3d2a00', color: '#ffcc80', border: '1px solid #5a3d00' },
@@ -138,8 +138,11 @@ export default function ListaAsistencia({
   onConfirmar,
   onMoverSuplente,
 }) {
+  // Una fila por jugador aunque haya participaciones duplicadas
+  const unicas = unaPorJugador(participaciones)
+
   function getEstado(jugadorId) {
-    const p = participaciones.find((p) => p.jugador_id === jugadorId)
+    const p = unicas.find((p) => p.jugador_id === jugadorId)
     if (!p) return 'sin_respuesta'
     if (esTitular(p)) return 'titular'
     if (esSuplente(p)) return 'suplente'
@@ -150,7 +153,7 @@ export default function ListaAsistencia({
   const porId = Object.fromEntries(jugadores.map((j) => [j.id, j]))
   // Titulares y suplentes en orden de inscripción (el que vuelve a confirmar va al final)
   const enOrdenDeLlegada = (filtro) =>
-    ordenarPorInscripcion(participaciones.filter(filtro))
+    ordenarPorInscripcion(unicas.filter(filtro))
       .map((p) => porId[p.jugador_id])
       .filter(Boolean)
   const titulares = enOrdenDeLlegada(esTitular)

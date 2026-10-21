@@ -118,15 +118,31 @@ export function useVotacionMVP(grupoId, jugadores, jugadorActual, cargandoJugado
     if (!votacionAbierta || !miParticipacion || miParticipacion.voto_mvp || !votado) return
     if (votado.jugador_id === miParticipacion.jugador_id) return
 
-    await votarMVP(votacionAbierta, miParticipacion, votado, grupoId)
+    // "Ya votaste ✓" al instante, sin esperar a Firestore; si falla se revierte
+    const anteriores = participaciones
+    setParticipaciones((prev) =>
+      prev.map((p) => (p.id === miParticipacion.id ? { ...p, voto_mvp: true } : p))
+    )
     setMiVoto(votadoJugadorId)
+    try {
+      await votarMVP(votacionAbierta, miParticipacion, votado, grupoId)
+    } catch (err) {
+      setParticipaciones(anteriores)
+      setMiVoto(null)
+      throw err // la pantalla muestra el error
+    }
 
-    // Si con este voto ya votaron todos, se cierra en el momento
-    const parts = await leerParticipacionesPartido(grupoId, votacionAbierta.id)
-    setParticipaciones(parts)
-    if (asistentesUnicos(parts).every((p) => p.voto_mvp)) {
-      await cerrarVotacionMVP(votacionAbierta, contexto, miParticipacion.jugador_id)
-      await cargar()
+    // El voto ya está guardado: si esto falla, no se revierte nada
+    try {
+      // Si con este voto ya votaron todos, se cierra en el momento
+      const parts = await leerParticipacionesPartido(grupoId, votacionAbierta.id)
+      setParticipaciones(parts)
+      if (asistentesUnicos(parts).every((p) => p.voto_mvp)) {
+        await cerrarVotacionMVP(votacionAbierta, contexto, miParticipacion.jugador_id)
+        await cargar()
+      }
+    } catch (err) {
+      console.error('No se pudo verificar si votaron todos', err)
     }
   }
 

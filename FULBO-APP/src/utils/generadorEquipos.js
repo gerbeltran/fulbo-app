@@ -1,3 +1,29 @@
+import { esTitular, unaPorJugador } from './suplentes'
+
+/**
+ * Los únicos que entran al generador: titulares (confirmo_asistencia = true y no
+ * suplentes), una sola participación por jugador. Usar siempre esto antes de generarEquipos.
+ */
+export function jugadoresParaGenerar(jugadores, participaciones) {
+  const titularesIds = unaPorJugador(participaciones)
+    .filter((p) => esTitular(p))
+    .map((p) => p.jugador_id)
+
+  const lista = jugadores
+    .filter((j) => titularesIds.includes(j.id))
+    .map((j) => ({
+      id: j.id,
+      nombre: j.nombre,
+      nivel_general: j.nivel_general,
+      posicion_preferida: j.posicion_preferida,
+    }))
+
+  // Para verificar en la consola quiénes se usan para armar los equipos
+  console.info(`[generadorEquipos] ${lista.length} titulares para generar equipos:`)
+  console.table(lista.map((j) => ({ id: j.id, nombre: j.nombre, nivel: j.nivel_general, pos: j.posicion_preferida })))
+  return lista
+}
+
 /**
  * Genera hasta `limite` combinaciones válidas de dos equipos.
  *

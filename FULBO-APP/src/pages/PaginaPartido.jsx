@@ -5,7 +5,8 @@ import PanelAdmin from '../components/partido/PanelAdmin'
 import ListaAsistencia from '../components/partido/ListaAsistencia'
 import PanelVotacionEquipos from '../components/partido/PanelVotacionEquipos'
 import ModalCerrarPartido from '../components/partido/ModalCerrarPartido'
-import { esTitular } from '../utils/suplentes'
+import ModalEditarEquipos from '../components/partido/ModalEditarEquipos'
+import { esTitular, unaPorJugador } from '../utils/suplentes'
 import { mensajePartido } from '../utils/whatsapp'
 import BotonWhatsApp from '../components/BotonWhatsApp'
 
@@ -96,6 +97,18 @@ function AcordeonAdmin({ abierto, onAlternar, children }) {
   )
 }
 
+// Admin: abre el editor para cambiar jugadores de equipo
+function BotonEditarEquipos({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full btn-secundario py-2 text-sm"
+    >
+      🔁 Cambiar jugadores de equipo
+    </button>
+  )
+}
+
 // Bajarse cuando los equipos ya están armados avisa a todo el grupo
 // (salvo que seas suplente: ahí solo dejás la lista de espera)
 function BotonBajarse({ onBajarse, esSuplente }) {
@@ -159,6 +172,8 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
     config,
     cargando,
     error,
+    errorAccion,
+    limpiarErrorAccion,
     confirmados,
     suplentes,
     votosActuales,
@@ -177,9 +192,11 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
     forzarCombinacion,
     avanzarCombinacion,
     cerrarPartido,
+    editarEquipos,
     votacionMvpAbierta,
   } = usePartido(jugadores, grupoId)
   const [cerrandoPartido, setCerrandoPartido] = useState(false)
+  const [editandoEquipos, setEditandoEquipos] = useState(false)
 
   const jugadoresActivos = jugadores.filter((j) => j.activo)
 
@@ -194,6 +211,13 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
   const estadisticas = useEstadisticas(grupoId)
   const lider = estadisticas.ranking(jugadoresActivos)[0]
   const hayPresencias = lider && lider.partidos > 0
+
+  // Si la acción falló (ya revertida en pantalla), el aviso se va solo
+  useEffect(() => {
+    if (!errorAccion) return
+    const temporizador = setTimeout(limpiarErrorAccion, 6000)
+    return () => clearTimeout(temporizador)
+  }, [errorAccion])
 
   const miParticipacion = participaciones.find(
     (p) => p.jugador_id === jugadorActual?.id
@@ -240,7 +264,7 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
   // Datos para la tarjeta de asistencia
   const idsConRespuesta = participaciones.map((p) => p.jugador_id)
   const sinRespuesta = jugadoresActivos.filter((j) => !idsConRespuesta.includes(j.id)).length
-  const noVan = participaciones.filter((p) => p.confirmo_asistencia === false).length
+  const noVan = unaPorJugador(participaciones).filter((p) => p.confirmo_asistencia === false).length
 
   const listo = !cargando && !cargandoJugadores && !error
 
@@ -295,6 +319,7 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
             onForzar={forzarCombinacion}
             onAvanzar={() => avanzarCombinacion()}
           />
+          {esAdmin && equipoActual && <BotonEditarEquipos onClick={() => setEditandoEquipos(true)} />}
           {puedeBajarse && (
             <BotonBajarse
               esSuplente={soySuplente}
@@ -337,6 +362,7 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
             onForzar={null}
             onAvanzar={null}
           />
+          {esAdmin && equipoConfirmado && <BotonEditarEquipos onClick={() => setEditandoEquipos(true)} />}
           {puedeBajarse && (
             <BotonBajarse
               esSuplente={soySuplente}
@@ -382,6 +408,17 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
             <button onClick={cargar} className="btn-primario px-5 py-2.5 text-sm">
               Reintentar
             </button>
+          </div>
+        )}
+
+        {/* Error de VOY / voto: la pantalla ya volvió a como estaba */}
+        {errorAccion && (
+          <div
+            role="alert"
+            className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-sm text-[#F87171]"
+          >
+            <span className="flex-1">{errorAccion}</span>
+            <button onClick={limpiarErrorAccion} className="shrink-0 px-1 hover:text-white" aria-label="Cerrar aviso">✕</button>
           </div>
         )}
 
@@ -519,6 +556,20 @@ export default function PaginaPartido({ jugadores, cargandoJugadores, grupoId, j
           </div>
         )}
       </div>
+
+      {editandoEquipos && (equipoActual || equipoConfirmado) && (
+        <ModalEditarEquipos
+          equipo={conDatosActuales(equipoConfirmado ?? equipoActual)}
+          titularesIds={confirmados.map((p) => p.jugador_id)}
+          jugadoresPorId={jugadoresPorId}
+          estado={partido.estado}
+          onGuardar={async (equipo1, equipo2) => {
+            await editarEquipos(equipo1, equipo2)
+            setEditandoEquipos(false)
+          }}
+          onCancelar={() => setEditandoEquipos(false)}
+        />
+      )}
 
       {cerrandoPartido && partido?.estado === 'confirmado' && (
         <ModalCerrarPartido

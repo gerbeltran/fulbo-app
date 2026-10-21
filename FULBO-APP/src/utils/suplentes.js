@@ -26,3 +26,19 @@ export function ordenarPorInscripcion(participaciones) {
 export function baseVotacion(cantidadTitulares, cupoMaximo) {
   return Math.min(cantidadTitulares, cupoMaximo ?? CUPO_POR_DEFECTO)
 }
+
+// Una participación por jugador: hay datos viejos con duplicadas (y dos dispositivos
+// podían crear dos a la vez). Se queda con la primera, la misma que muestra la lista.
+export function unaPorJugador(participaciones) {
+  const vistos = new Set()
+  return participaciones.filter((p) => {
+    if (vistos.has(p.jugador_id)) return false
+    vistos.add(p.jugador_id)
+    return true
+  })
+}
+
+// Id fijo para las participaciones nuevas: evita que se dupliquen
+export function idParticipacion(partidoId, jugadorId) {
+  return `${partidoId}_${jugadorId}`
+}

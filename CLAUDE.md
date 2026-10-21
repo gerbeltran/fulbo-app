@@ -75,7 +75,8 @@ NOTIFICACION:   id, grupo_id, destinatario_uid (null = todo el grupo), jugador_i
 
 ## Reglas de negocio importantes
 - Los niveles los asigna **solo el admin** manualmente, nunca se auto-calculan
-- No hay drag & drop para intercambiar jugadores (Fase 1)
+- No hay drag & drop (Fase 1): el admin cambia jugadores de equipo tocando (seleccionar + intercambiar)
+  desde "Cambiar jugadores de equipo"; votando, eso borra los votos de esa propuesta
 - El consenso de equipos se logra regenerando combinaciones alternativas
 - Usuarios esperados: 5–20 personas (grupo de amigos)
 
